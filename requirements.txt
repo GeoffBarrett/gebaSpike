@@ -1,0 +1,12 @@
+cycler==0.10.0
+kiwisolver==1.0.1
+matplotlib==3.0.3
+numpy==1.16.2
+PyOpenGL==3.1.0
+pyparsing==2.3.1
+PyQt5==5.12.1
+PyQt5-sip==4.19.15
+pyqtgraph==0.10.0
+python-dateutil==2.8.0
+scipy==1.2.1
+six==1.12.0

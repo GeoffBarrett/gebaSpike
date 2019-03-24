@@ -1,10 +1,16 @@
 import sys
 import pyqtgraph as pg
 from PyQt5 import QtCore, QtGui, QtWidgets
+from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
 from core.gui_utils import center, validate_session, Communicate
-from core.default_parameters import project_name, default_filename, defaultXAxis, defaultYAxis, defaultZAxis
+from core.default_parameters import project_name, default_filename, defaultXAxis, defaultYAxis, defaultZAxis, openGL, \
+featureGrid
 from core.Tint_Matlab import find_tet
-from core.plot_functions import plot_features
+from core.plot_functions import manage_features, feature_name_map
+from core.plot_utils import CustomViewBox, PltWidget
+import pyqtgraph.opengl as gl
+# from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+from mpl_toolkits.mplot3d import Axes3D
 import os
 import json
 import time
@@ -18,7 +24,7 @@ class MainWindow(QtWidgets.QWidget):
         self.setWindowTitle("%s - Main Window" % project_name)  # sets the main window title
 
         # initializing attributes
-        self.win = None
+        self.feature_win = None
         self.quit_btn = None
         self.filename = None
         self.choose_filename_btn = None
@@ -27,7 +33,30 @@ class MainWindow(QtWidgets.QWidget):
         self.z_axis_cb = None
         self.tetrode_cb = None
         self.choice = None
+        self.plot_btn = None
         self.feature_plot = None
+
+        self.feature_data = None
+        self.tetrode_data = None
+        self.cut_data = None
+        self.cut_data_original = None
+        self.spike_times = None
+        self.scatterItem = None
+        self.glViewWidget = None
+        self.channel_cb = None
+        self.channel_cb_set = None
+        self.feature_plot_added = False
+        self.samples_per_spike = None
+
+        self.xline = None
+        self.yline = None
+        self.zline = None
+
+        self.spike_colors = None
+
+        self.unit_plots = {}
+        self.unit_rows = 0
+        self.unit_cols = 0
 
         self.LogError = Communicate()
         self.LogError.signal.connect(self.raiseError)
@@ -40,9 +69,11 @@ class MainWindow(QtWidgets.QWidget):
         # defining the directory filepath
         self.PROJECT_DIR = project_dir  # project directory
         self.SETTINGS_DIR = os.path.join(self.PROJECT_DIR, 'settings')  # settings directory
-        self.settings_filename = os.path.join(self.SETTINGS_DIR, 'settings.json')
 
+        self.settings_filename = os.path.join(self.SETTINGS_DIR, 'settings.json')
         self.settings = self.get_settings()
+
+        self.IMG_DIR = os.path.join(self.PROJECT_DIR, 'img')  # settings directory
 
         # create Settings Directory
         if not os.path.exists(self.SETTINGS_DIR):
@@ -54,9 +85,13 @@ class MainWindow(QtWidgets.QWidget):
                 json.dump({}, f)
 
         # setting PyQtGraph settings
-        pg.setConfigOption('background', 'w')
-        pg.setConfigOption('foreground', 'k')
+        # pg.setConfigOption('background', 'w')
+        # pg.setConfigOption('foreground', 'k')
+        pg.setConfigOptions(antialias=True)
 
+        QtWidgets.QApplication.setStyle(QtWidgets.QStyleFactory.create('GTK+'))
+
+        self.setWindowIcon(QtGui.QIcon(os.path.join(self.IMG_DIR, 'GEBA_Logo.png')))  # declaring the icon image
         self.initialize()  # initializes the main window
 
     def initialize(self):
@@ -82,7 +117,7 @@ class MainWindow(QtWidgets.QWidget):
 
         # -------- spike parameter options -------------------------------------
 
-        feature_options = ['None', 'PC1', 'PC2', 'PC3', 'PC4', 'A', 'P', 'T', 'tT', 'tP', 'E']
+        feature_options = ["None"] + list(feature_name_map.keys())
 
         spike_parameter_layout = QtWidgets.QHBoxLayout()
         x_axis_label = QtWidgets.QLabel("X-Axis")
@@ -124,14 +159,19 @@ class MainWindow(QtWidgets.QWidget):
         axis_layout.addLayout(y_axis_layout)
         axis_layout.addLayout(z_axis_layout)
 
+        channel_layout = QtWidgets.QHBoxLayout()
+        channel_label = QtWidgets.QLabel("Channel:")
+        self.channel_cb = QtWidgets.QComboBox()
+        channel_layout.addWidget(channel_label)
+        channel_layout.addWidget(self.channel_cb)
+
         tetrode_layout = QtWidgets.QHBoxLayout()
         tetrode_label = QtWidgets.QLabel("Tetrode:")
         self.tetrode_cb = QtWidgets.QComboBox()
-
         tetrode_layout.addWidget(tetrode_label)
         tetrode_layout.addWidget(self.tetrode_cb)
 
-        spike_parameter_widgets = [tetrode_layout, axis_layout]
+        spike_parameter_widgets = [tetrode_layout, channel_layout, axis_layout]
 
         spike_parameter_layout.addStretch(1)
         for i, widget in enumerate(spike_parameter_widgets):
@@ -142,17 +182,47 @@ class MainWindow(QtWidgets.QWidget):
                 spike_parameter_layout.addWidget(widget, 0, QtCore.Qt.AlignCenter)
                 spike_parameter_layout.addStretch(1)
 
-        self.win = pg.GraphicsWindow()
-        self.feature_plot = self.win.addPlot(row=1, col=0, colspan=2,
-                                                # viewBox=CustomViewBox(self, self.win)
-                                             )
+        if openGL:
+            self.feature_win = pg.GraphicsWindow()
+            feature_win_layout = QtWidgets.QGridLayout()
+            self.feature_win.setLayout(feature_win_layout)
+            self.glViewWidget = gl.GLViewWidget()
+            self.glViewWidget.setBackgroundColor('k')
+
+            """
+            if featureGrid:
+                self.xgrid = gl.GLGridItem(color=(0, 0, 0))
+                self.ygrid = gl.GLGridItem(color=(0, 0, 0))
+                self.zgrid = gl.GLGridItem(color=(0, 0, 0))
+                self.glViewWidget.addItem(self.xgrid)
+                self.glViewWidget.addItem(self.ygrid)
+                self.glViewWidget.addItem(self.zgrid)
+
+                # rotate x and y grids to face the correct direction
+                self.xgrid.rotate(90, 0, 1, 0)
+                self.ygrid.rotate(90, 1, 0, 0)
+            """
+
+            feature_win_layout.addWidget(self.glViewWidget)
+        else:
+            # self.feature_win = PltWidget(self)
+            self.feature_win = MatplotlibWidget()
+            self.feature_win.toolbar.hide()  # hide the toolbar
+
+        self.unit_win = pg.GraphicsWindow()
+        # self.unit_plot = PltWidget(self)
+        # self.unit_win.addItem(self.unit_plot)
+
+        plot_layout = QtWidgets.QHBoxLayout()
+        for _object in [self.feature_win, self.unit_win]:
+            plot_layout.addWidget(_object)
 
         # --------- Create the Buttons at the bottom of the Main Window ------------- #
 
         button_layout = QtWidgets.QHBoxLayout()
 
         self.plot_btn = QtWidgets.QPushButton("Plot")
-        self.plot_btn.clicked.connect(lambda: plot_features(self))
+        self.plot_btn.clicked.connect(lambda: manage_features(self))
 
         self.quit_btn = QtWidgets.QPushButton("Quit")
         self.quit_btn.clicked.connect(self.close_app)
@@ -166,7 +236,7 @@ class MainWindow(QtWidgets.QWidget):
 
         main_window_layout = QtWidgets.QVBoxLayout()
 
-        layout_order = [filename_layout, spike_parameter_layout, self.win, button_layout]
+        layout_order = [filename_layout, spike_parameter_layout, plot_layout, button_layout]
 
         # ---------------- add all the layouts and widgets to the Main Window's layout ------------ #
 
@@ -239,6 +309,22 @@ class MainWindow(QtWidgets.QWidget):
         with open(self.settings_filename, 'w') as f:
             json.dump(self.settings, f, sort_keys=True, indent=4)
 
+    def reset_parameters(self):
+        self.feature_data = None
+        self.tetrode_data = None
+        self.cut_data = None
+        self.cut_data_original = None
+        self.spike_times = None
+        self.scatterItem = None
+        self.channel_cb_set = None
+
+        self.samples_per_spike = None
+        self.spike_colors = None
+
+        self.unit_plots = {}
+        self.unit_rows = 0
+        self.unit_cols = 0
+
     def choose_filename(self):
         """
         This method will allow you to choose a filename to analyze.
@@ -273,6 +359,8 @@ class MainWindow(QtWidgets.QWidget):
         if session_valid:
             # replace the current .set field in the choose .set window with chosen filename
             self.filename.setText(current_filename)
+            self.reset_parameters()
+
         else:
             if not error_raised:
                 self.choice = None

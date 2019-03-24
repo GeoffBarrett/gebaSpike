@@ -23,7 +23,9 @@ setuptools.setup(
         'PyQtGraph',
         'PyQt5',
         'scipy',
+        'PyOpenGl'
     ],
+    package_data={'gebaSpike': ['img/*.png']},
     classifiers=[
         "Programming Language :: Python :: 3.7 ",
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3) ",
