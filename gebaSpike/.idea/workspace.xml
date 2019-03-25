@@ -2,15 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="5c1c0abd-cbce-4393-93b3-90b625a62953" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/core/custom_widgets.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/core/plot_utils.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/img/__init__.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/img/desktop.ini" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/default_parameters.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/default_parameters.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/plot_functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/plot_functions.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../setup.py" beforeDir="false" afterPath="$PROJECT_DIR$/../setup.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -87,11 +79,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/main.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-3905">
-              <caret line="54" column="32" selection-start-line="54" selection-start-column="32" selection-end-line="54" selection-end-column="32" />
-              <folding>
-                <element signature="e#0#10#0" expanded="true" />
-              </folding>
+            <state relative-caret-position="34">
+              <caret line="2" column="42" lean-forward="true" selection-start-line="2" selection-start-column="42" selection-end-line="2" selection-end-column="42" />
             </state>
           </provider>
         </entry>
@@ -120,8 +109,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/core/plot_functions.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="188">
-              <caret line="132" selection-start-line="132" selection-end-line="132" />
+            <state relative-caret-position="258">
+              <caret line="243" column="99" selection-start-line="243" selection-start-column="99" selection-end-line="243" selection-end-column="99" />
               <folding>
                 <element signature="e#0#9#0" expanded="true" />
               </folding>
@@ -229,9 +218,10 @@
       <find>PltWidget</find>
       <find>EllipseROI</find>
       <find>self.cut_data</find>
-      <find>viewbox =</find>
       <find>stateChangeFinished</find>
       <find>unit_plot</find>
+      <find>viewbox =</find>
+      <find>Matplot</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -453,6 +443,7 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
+    <editor active="true" />
     <layout>
       <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.09799789" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.24973656" />
@@ -678,28 +669,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/graphicsItems/ROI.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="323">
-          <caret line="19" selection-start-line="19" selection-end-line="19" selection-end-column="25" />
-          <folding>
-            <element signature="e#7160#7319#0" />
-            <element signature="e#8130#8236#0" />
-            <element signature="e#8520#8752#0" />
-            <element signature="e#53611#63253#0" />
-            <element signature="e#68337#68375#0" />
-            <element signature="e#68431#68470#0" />
-            <element signature="e#68522#68781#0" />
-            <element signature="e#68864#69569#0" />
-            <element signature="e#69659#71151#0" />
-            <element signature="e#71207#71606#0" />
-            <element signature="e#72766#73048#0" />
-            <element signature="e#73132#74037#0" />
-            <element signature="e#74231#75032#0" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$USER_HOME$/.PyCharmCE2018.3/system/python_stubs/-70813459/PyQt5/QtWidgets/__init__.py">
       <provider selected="true" editor-type-id="text-editor" />
     </entry>
@@ -747,20 +716,39 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/graphicsItems/ROI.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="323">
+          <caret line="19" selection-start-line="19" selection-end-line="19" selection-end-column="25" />
+          <folding>
+            <element signature="e#7160#7319#0" />
+            <element signature="e#8130#8236#0" />
+            <element signature="e#8520#8752#0" />
+            <element signature="e#53611#63253#0" />
+            <element signature="e#68337#68375#0" />
+            <element signature="e#68431#68470#0" />
+            <element signature="e#68522#68781#0" />
+            <element signature="e#68864#69569#0" />
+            <element signature="e#69659#71151#0" />
+            <element signature="e#71207#71606#0" />
+            <element signature="e#72766#73048#0" />
+            <element signature="e#73132#74037#0" />
+            <element signature="e#74231#75032#0" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/main.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-3905">
-          <caret line="54" column="32" selection-start-line="54" selection-start-column="32" selection-end-line="54" selection-end-column="32" />
-          <folding>
-            <element signature="e#0#10#0" expanded="true" />
-          </folding>
+        <state relative-caret-position="34">
+          <caret line="2" column="42" lean-forward="true" selection-start-line="2" selection-start-column="42" selection-end-line="2" selection-end-column="42" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/core/plot_functions.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="188">
-          <caret line="132" selection-start-line="132" selection-end-line="132" />
+        <state relative-caret-position="258">
+          <caret line="243" column="99" selection-start-line="243" selection-start-column="99" selection-end-line="243" selection-end-column="99" />
           <folding>
             <element signature="e#0#9#0" expanded="true" />
           </folding>

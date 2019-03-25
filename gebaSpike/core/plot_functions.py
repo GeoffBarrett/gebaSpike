@@ -7,6 +7,8 @@ from core.Tint_Matlab import find_unit, getspikes
 from core.feature_functions import CreateFeatures
 from core.plot_utils import CustomViewBox, get_channel_color
 import pyqtgraph.opengl as gl
+import pyqtgraph as pg
+from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
 from core.custom_widgets import GLEllipseROI
 
 
@@ -240,6 +242,12 @@ def manage_unit_plots(self):
             """
 
             self.unit_plots[index].plot(np.mean(cell_data[0], axis=0), pen=get_channel_color(cell))
+
+            self.unit_plots[index].setXRange(0, self.samples_per_spike, padding=0)  # set the x-range
+            self.unit_plots[index].hideAxis('left')  # remove the y-axis
+            self.unit_plots[index].hideAxis('bottom')  # remove the x axis
+            self.unit_plots[index].hideButtons()  # hide the auto-resize button
+            self.unit_plots[index].setMouseEnabled(x=False, y=False)  # disables the mouse interactions
 
             col += 1
             if col >= cols:
