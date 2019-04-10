@@ -1,5 +1,6 @@
 import pyqtgraph as pg
 from PyQt5 import QtCore, QtGui, QtWidgets
+import numpy as np
 from exporters import ImageExporter
 
 
@@ -110,3 +111,22 @@ class PltWidget(pg.PlotWidget):
         """
         super(PltWidget, self).__init__(parent, viewBox=CustomViewBox(window, self))
 
+
+class MultiLine(pg.QtGui.QGraphicsPathItem):
+    def __init__(self, x, y, *args, **kwargs):
+        """x and y are 2D arrays of shape (Nplots, Nsamples)"""
+        connect = np.ones(x.shape, dtype=bool)
+        connect[:, -1] = 0  # don't draw the segment between each trace
+        self.path = pg.arrayToQPath(x.flatten(), y.flatten(), connect.flatten())
+        pg.QtGui.QGraphicsPathItem.__init__(self, self.path)
+
+        if 'pen' in kwargs.keys():
+            self.setPen(pg.mkPen(kwargs['pen']))
+        else:
+            self.setPen(pg.mkPen('w'))
+
+    def shape(self): # override because QGraphicsPathItem.shape is too expensive.
+        return pg.QtGui.QGraphicsItem.shape(self)
+
+    def boundingRect(self):
+        return self.path.boundingRect()

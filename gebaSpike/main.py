@@ -4,13 +4,13 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
 from core.gui_utils import center, validate_session, Communicate
 from core.default_parameters import project_name, default_filename, defaultXAxis, defaultYAxis, defaultZAxis, openGL, \
-featureGrid
+unitMode
 from core.Tint_Matlab import find_tet
 from core.plot_functions import manage_features, feature_name_map
-from core.plot_utils import CustomViewBox, PltWidget
+# from core.plot_utils import CustomViewBox, PltWidget
 import pyqtgraph.opengl as gl
 # from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
-from mpl_toolkits.mplot3d import Axes3D
+# from mpl_toolkits.mplot3d import Axes3D
 import os
 import json
 import time
@@ -44,7 +44,6 @@ class MainWindow(QtWidgets.QWidget):
         self.scatterItem = None
         self.glViewWidget = None
         self.channel_cb = None
-        self.channel_cb_set = None
         self.feature_plot_added = False
         self.samples_per_spike = None
 
@@ -55,6 +54,8 @@ class MainWindow(QtWidgets.QWidget):
         self.spike_colors = None
 
         self.unit_plots = {}
+        self.plot_lines = {}
+        self.avg_plot_lines = {}
         self.unit_rows = 0
         self.unit_cols = 0
 
@@ -69,6 +70,8 @@ class MainWindow(QtWidgets.QWidget):
         # defining the directory filepath
         self.PROJECT_DIR = project_dir  # project directory
         self.SETTINGS_DIR = os.path.join(self.PROJECT_DIR, 'settings')  # settings directory
+
+        # self.unit_plotwidget = {}
 
         self.settings_filename = os.path.join(self.SETTINGS_DIR, 'settings.json')
         self.settings = self.get_settings()
@@ -162,6 +165,15 @@ class MainWindow(QtWidgets.QWidget):
         channel_layout = QtWidgets.QHBoxLayout()
         channel_label = QtWidgets.QLabel("Channel:")
         self.channel_cb = QtWidgets.QComboBox()
+
+        for channel in range(4):
+            self.channel_cb.addItem(str(channel+1))
+
+        self.channel_cb.currentIndexChanged.connect(self.channel_changed)
+        self.channel_cb.setCurrentIndex(0)
+
+        self.channel = int(self.channel_cb.currentText()) - 1
+
         channel_layout.addWidget(channel_label)
         channel_layout.addWidget(self.channel_cb)
 
@@ -189,29 +201,20 @@ class MainWindow(QtWidgets.QWidget):
             self.glViewWidget = gl.GLViewWidget()
             self.glViewWidget.setBackgroundColor('k')
 
-            """
-            if featureGrid:
-                self.xgrid = gl.GLGridItem(color=(0, 0, 0))
-                self.ygrid = gl.GLGridItem(color=(0, 0, 0))
-                self.zgrid = gl.GLGridItem(color=(0, 0, 0))
-                self.glViewWidget.addItem(self.xgrid)
-                self.glViewWidget.addItem(self.ygrid)
-                self.glViewWidget.addItem(self.zgrid)
-
-                # rotate x and y grids to face the correct direction
-                self.xgrid.rotate(90, 0, 1, 0)
-                self.ygrid.rotate(90, 1, 0, 0)
-            """
-
             feature_win_layout.addWidget(self.glViewWidget)
         else:
             # self.feature_win = PltWidget(self)
             self.feature_win = MatplotlibWidget()
             self.feature_win.toolbar.hide()  # hide the toolbar
 
-        self.unit_win = pg.GraphicsWindow()
-        # self.unit_plot = PltWidget(self)
-        # self.unit_win.addItem(self.unit_plot)
+        if unitMode == 'MatplotWidget':
+            self.unit_win = MatplotlibWidget()
+            self.unit_win.toolbar.hide()  # hide the toolbar
+
+        else:
+            self.unit_win = pg.GraphicsWindow()
+            # self.unit_win_layout = QtWidgets.QGridLayout()
+            # self.unit_win.setLayout(self.unit_win_layout)
 
         plot_layout = QtWidgets.QHBoxLayout()
         for _object in [self.feature_win, self.unit_win]:
@@ -237,19 +240,21 @@ class MainWindow(QtWidgets.QWidget):
         main_window_layout = QtWidgets.QVBoxLayout()
 
         layout_order = [filename_layout, spike_parameter_layout, plot_layout, button_layout]
-
+        add_Stretch = [False, False, False, False]
         # ---------------- add all the layouts and widgets to the Main Window's layout ------------ #
 
-        main_window_layout.addStretch(1)  # adds the widgets/layouts according to the order
-        for widget in layout_order:
+        # main_window_layout.addStretch(1)  # adds the widgets/layouts according to the order
+        for widget, addStretch in zip(layout_order, add_Stretch):
             if 'Layout' in widget.__str__():
                 main_window_layout.addLayout(widget)
-                main_window_layout.addStretch(1)
+                if addStretch:
+                    main_window_layout.addStretch(1)
             else:
                 main_window_layout.addWidget(widget, 0, QtCore.Qt.AlignCenter)
-                main_window_layout.addStretch(1)
+                if addStretch:
+                    main_window_layout.addStretch(1)
 
-        main_window_layout.addStretch(1)  # adds stretch to put the version info at the bottom
+        # main_window_layout.addStretch(1)  # adds stretch to put the version info at the bottom
 
         self.setLayout(main_window_layout)  # defining the layout of the Main Window
 
@@ -261,11 +266,11 @@ class MainWindow(QtWidgets.QWidget):
         """This method will prompt the user, asking if they would like to quit or not"""
         # pop up window that asks if you really want to exit the app ------------------------------------------------
 
-        choice = QtGui.QMessageBox.question(self, "Quitting ",
+        choice = QtWidgets.QMessageBox.question(self, "Quitting ",
                                             "Do you really want to exit?",
-                                            QtGui.QMessageBox.Yes | QtGui.QMessageBox.No)
+                                            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
 
-        if choice == QtGui.QMessageBox.Yes:
+        if choice == QtWidgets.QMessageBox.Yes:
             sys.exit()  # tells the app to quit
         else:
             pass
@@ -300,8 +305,10 @@ class MainWindow(QtWidgets.QWidget):
                                                          QtWidgets.QMessageBox.Ok)
 
     def get_settings(self):
-        with open(self.settings_filename, 'r') as f:
-            settings = json.load(f)
+        settings = {}
+        if os.path.exists(self.settings_filename):
+            with open(self.settings_filename, 'r') as f:
+               settings = json.load(f)
         return settings
 
     def overwrite_settings(self):
@@ -316,7 +323,9 @@ class MainWindow(QtWidgets.QWidget):
         self.cut_data_original = None
         self.spike_times = None
         self.scatterItem = None
-        self.channel_cb_set = None
+
+        self.plot_lines = {}
+        self.avg_plot_lines = {}
 
         self.samples_per_spike = None
         self.spike_colors = None
@@ -332,16 +341,16 @@ class MainWindow(QtWidgets.QWidget):
         """
 
         if 'file_directory' not in self.settings.keys():
-            current_filename, filename_filter = QtGui.QFileDialog.getOpenFileName(
+            current_filename, filename_filter = QtWidgets.QFileDialog.getOpenFileName(
                 self, caption="Select a '.Set' file!", directory='', filter='Set Files (*.set)')
 
         else:
             if os.path.exists(self.settings['file_directory']):
-                current_filename, filename_filter = QtGui.QFileDialog.getOpenFileName(
+                current_filename, filename_filter = QtWidgets.QFileDialog.getOpenFileName(
                     self, caption="Select a '.Set' file!", directory=self.settings['file_directory'],
                     filter='Set Files (*.set)')
             else:
-                current_filename, filename_filter = QtGui.QFileDialog.getOpenFileName(
+                current_filename, filename_filter = QtWidgets.QFileDialog.getOpenFileName(
                     self, caption="Select a '.Set' file!", directory='', filter='Set Files (*.set)')
 
         # if no file chosen, skip
@@ -381,6 +390,10 @@ class MainWindow(QtWidgets.QWidget):
             for file in tetrode_list:
                 tetrode = os.path.splitext(file)[-1][1:]
                 self.tetrode_cb.addItem(tetrode)
+
+    def channel_changed(self):
+
+        self.channel = int(self.channel_cb.currentText()) - 1
 
 
 def launch_gui():

@@ -1,11 +1,11 @@
 import os
 import time
 import numpy as np
-from core.default_parameters import openGL, featureGrid, gridLines, feature_spike_opacity, feature_spike_size
+from core.default_parameters import openGL, gridLines, feature_spike_opacity, feature_spike_size, unitMode
 from core.gui_utils import validate_session
 from core.Tint_Matlab import find_unit, getspikes
 from core.feature_functions import CreateFeatures
-from core.plot_utils import CustomViewBox, get_channel_color
+from core.plot_utils import CustomViewBox, get_channel_color, MultiLine
 import pyqtgraph.opengl as gl
 import pyqtgraph as pg
 from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
@@ -79,14 +79,6 @@ def plot_features(self):
 
     if openGL:
         # --------------- this is if we want to use the open gl 3d plots ---------------------------- #
-        """
-        if featureGrid:
-            self.xgrid.translate(np.amin(Y), 0, 0)
-            self.ygrid.translate(np.amin(X), 0, 0)
-
-            if Zaxis:
-                self.zgrid.translate(np.amax(X), 0, 0)
-        """
 
         # Add the axis lines to the plot to provide users with orientation
         if gridLines:
@@ -218,16 +210,19 @@ def manage_unit_plots(self):
     rows, cols = get_grid_dimensions(n_cells)
 
     if rows != self.unit_rows or self.unit_cols != cols:
-        self.unit_win.clear()
-        self.unit_plots = {}
-        self.unit_plots_unit = {}
 
         row = 0
         col = 0
         for index in np.arange(len(unique_cells)):
 
             cell = unique_cells[index]
-            self.unit_plots[index] = self.unit_win.addPlot(row=row, col=col, viewBox=CustomViewBox(self, self.unit_win))
+
+            if unitMode == 'MatplotWidget':
+                self.unit_plots[index] = self.unit_win.getFigure().add_subplot(int('%d%d%d' % (rows, cols, index+1)))
+                self.unit_plots[index].axis('off')
+            else:
+                self.unit_plots[index] = self.unit_win.addPlot(row=row, col=col, viewBox=CustomViewBox(self,
+                                                                                                       self.unit_win))
 
             cell_bool = np.where(self.cut_data == cell)[0]
             cell_data = self.tetrode_data[:, cell_bool, :]
@@ -235,19 +230,36 @@ def manage_unit_plots(self):
             if self.samples_per_spike is None:
                 self.samples_per_spike = cell_data.shape[2]
 
-            """
-            for i in np.arange(cell_data.shape[0]):
-                for spike in np.arange(cell_data.shape[1]):
-                    self.unit_plots[index].plot(cell_data[i][spike, :])
-            """
+            if unitMode == 'MatplotWidget':
+                self.unit_plots[index].plot(cell_data[self.channel].T, 'b')
+                self.unit_plots[index].plot(np.mean(cell_data[self.channel], axis=0), 'k-')
 
-            self.unit_plots[index].plot(np.mean(cell_data[0], axis=0), pen=get_channel_color(cell))
+            elif unitMode == 'PyQtDefault':
+                # this uses the default plot() function of a graph
+                self.unit_plots[index].plot(np.mean(cell_data[self.channel], axis=0), pen=get_channel_color(cell))
 
-            self.unit_plots[index].setXRange(0, self.samples_per_spike, padding=0)  # set the x-range
-            self.unit_plots[index].hideAxis('left')  # remove the y-axis
-            self.unit_plots[index].hideAxis('bottom')  # remove the x axis
-            self.unit_plots[index].hideButtons()  # hide the auto-resize button
-            self.unit_plots[index].setMouseEnabled(x=False, y=False)  # disables the mouse interactions
+                self.unit_plots[index].setXRange(0, self.samples_per_spike, padding=0)  # set the x-range
+                self.unit_plots[index].hideAxis('left')  # remove the y-axis
+                self.unit_plots[index].hideAxis('bottom')  # remove the x axis
+                self.unit_plots[index].hideButtons()  # hide the auto-resize button
+                self.unit_plots[index].setMouseEnabled(x=False, y=False)  # disables the mouse interactions
+            else:
+
+                self.plot_lines[index] = MultiLine(np.tile(np.arange(self.samples_per_spike), (cell_data[self.channel].shape[0], 1)),
+                                                   cell_data[self.channel], pen=get_channel_color(cell))
+
+                self.avg_plot_lines[index] = MultiLine(np.arange(self.samples_per_spike).reshape((1, -1)),
+                                                       np.mean(cell_data[self.channel], axis=0).reshape((1, -1)),
+                                                       pen='k')
+
+                self.unit_plots[index].addItem(self.plot_lines[index])
+                self.unit_plots[index].addItem(self.avg_plot_lines[index])
+
+                self.unit_plots[index].setXRange(0, self.samples_per_spike, padding=0)  # set the x-range
+                self.unit_plots[index].hideAxis('left')  # remove the y-axis
+                self.unit_plots[index].hideAxis('bottom')  # remove the x axis
+                self.unit_plots[index].hideButtons()  # hide the auto-resize button
+                self.unit_plots[index].setMouseEnabled(x=False, y=False)  # disables the mouse interactions
 
             col += 1
             if col >= cols:
@@ -278,10 +290,6 @@ def manage_features(self):
         if os.path.exists(tetrode_filename):
 
             if self.tetrode_data is None:
-                if self.channel_cb_set is None:
-                    for i in np.arange(4):
-                        self.channel_cb.addItem(str(i+1))
-                        self.channel_cb_set = True
 
                 ts, ch1, ch2, ch3, ch4, spikeparams = getspikes(tetrode_filename)
                 self.tetrode_data = np.vstack((ch1, ch2, ch3, ch4)).reshape((4, -1, ch1.shape[1]))
