@@ -47,6 +47,10 @@ class MainWindow(QtWidgets.QWidget):
         self.feature_plot_added = False
         self.samples_per_spike = None
 
+        self.unit_drag_lines = {}
+        self.active_ROI = []
+        self.unit_data = {}
+
         self.xline = None
         self.yline = None
         self.zline = None
@@ -54,6 +58,7 @@ class MainWindow(QtWidgets.QWidget):
         self.spike_colors = None
 
         self.unit_plots = {}
+        self.vb = {}
         self.plot_lines = {}
         self.avg_plot_lines = {}
         self.unit_rows = 0
@@ -326,6 +331,11 @@ class MainWindow(QtWidgets.QWidget):
 
         self.plot_lines = {}
         self.avg_plot_lines = {}
+        self.vb = {}
+        self.active_ROI = []
+        self.unit_data = {}
+
+        self.unit_drag_lines = {}
 
         self.samples_per_spike = None
         self.spike_colors = None

@@ -10,6 +10,8 @@ import pyqtgraph.opengl as gl
 import pyqtgraph as pg
 from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
 from core.custom_widgets import GLEllipseROI
+from pyqtgraph.Qt import QtCore
+from functools import partial
 
 
 feature_name_map = {
@@ -180,26 +182,156 @@ def get_spike_colors(self):
         self.spike_colors[cell_bool, :-1] = np.asarray(cell_color)/255
 
 
-def get_grid_dimensions(n_cells):
+def get_grid_dimensions(n_cells, method='auto'):
+    """
+    This function will automate the rows and columns for grid of unit plots. Right now it will
+    attempt to just make the grid as square as possible. However, Tint does 5 per row, so I might
+    conform to that as well.
 
-    if np.sqrt(n_cells).is_integer():
-        rows = int(np.sqrt(n_cells))
-        cols = int(rows)
+    method='auto' will keep it as square of a shape as possible
+    method='5per' will make it 5 cells per row
+    """
+
+    if method == 'auto':
+        # try to make the shape as square as possible, if there are 9 cells it will do a
+        # 3 by 3 formation.
+
+        if np.sqrt(n_cells).is_integer():
+            rows = int(np.sqrt(n_cells))
+            cols = int(rows)
+        else:
+
+            value1 = int(np.ceil(np.sqrt(n_cells)))
+            value2 = int(np.floor(np.sqrt(n_cells)))
+
+            if value1 * value2 < n_cells:
+                value2 = int(np.ceil(np.sqrt(n_cells)))
+
+            cols, rows = sorted(np.array([value1, value2]))
+
+        # I prefer there being more columns than rows if necessary.
+        if rows <= cols:
+            return rows, cols
+        else:
+            return cols, rows
+    elif method == '5per':
+        # return 5 units per row
+
+        rows = 5
+        cols = int(np.ceil(n_cells/rows))
+
+        return rows, cols
+
+
+def drag(self, index, ev=None):
+    # global vb, lr
+    if ev.button() == QtCore.Qt.LeftButton:
+
+        for roi in self.active_ROI:
+            roi.hide()
+
+        self.unit_drag_lines[index].show()  # showing the LineSegmentROI
+
+        self.active_ROI = [self.unit_drag_lines[index]]
+
+        # defining the start of the selected region
+        points = [[self.vb[index].mapToView(ev.buttonDownPos()).x(),
+                  self.vb[index].mapToView(ev.buttonDownPos()).y()],
+                  [self.vb[index].mapToView(ev.pos()).x(),
+                   self.vb[index].mapToView(ev.pos()).y()]]
+
+        self.unit_drag_lines[index].setPoints(points)
+
+        ev.accept()
     else:
-        '''Finding geometry for the subplots'''
-
-        value1 = int(np.ceil(np.sqrt(n_cells)))
-        value2 = int(np.floor(np.sqrt(n_cells)))
-
-        if value1 * value2 < n_cells:
-            value2 = int(np.ceil(np.sqrt(n_cells)))
-
-        cols, rows = sorted(np.array([value1, value2]))
-
-    return rows, cols
+        pg.ViewBox.mouseDragEvent(self.vb[index], ev)
 
 
-def manage_unit_plots(self):
+def getSlope(points):
+    points_diffs = np.diff(points, axis=0).flatten()
+    slope = points_diffs[1] / points_diffs[0]
+    return slope
+
+
+def getYIntercept(slope, point):
+    return point[1] - slope * point[0]
+
+
+def mouse_click_event(self, index, ev=None):
+
+    if ev.button() == QtCore.Qt.RightButton:
+        # open menu
+        pg.ViewBox.mouseClickEvent(self.vb[index], ev)
+
+    elif ev.button() == QtCore.Qt.LeftButton:
+
+        # hopefully drag event
+        pg.ViewBox.mouseClickEvent(self.vb[index], ev)
+
+    elif ev.button() == QtCore.Qt.MiddleButton:
+        # then we will accept the changes
+
+        if self.unit_drag_lines[index] in self.active_ROI:
+            # then we have an active ROI
+            # we will get the x,y positions (rounded to the nearest int) of the selected line
+            points = np.rint(np.asarray(self.unit_drag_lines[index].getState()['points']))
+
+            unit_data = self.unit_data[index]
+
+            crossed_cells = find_spikes_crossed(points, unit_data)
+
+            self.unit_data[index] = np.delete(unit_data, crossed_cells, axis=0)
+
+            replot_unit(self, index)
+
+            self.unit_drag_lines[index].hide()
+            self.active_ROI.remove(self.unit_drag_lines[index])
+
+
+def find_spikes_crossed(points, unit_data, samples_per_spike=50):
+    # calculate the line equation so we can get the points on the line
+    slope = getSlope(points)
+    y0 = getYIntercept(slope, points[0])
+    dx = np.diff(points, axis=0)[0, 0]  # change in x
+    x = np.arange(dx) + points[0, 0]
+
+    cross_line = slope * x + y0  # equation for the user's line
+
+    unit_data_bool = np.intersect1d(x, np.arange(samples_per_spike))
+
+    crossed_cells = np.unique(np.where(np.diff(np.sign(cross_line - unit_data[:, unit_data_bool.astype(int)])))[0])
+
+    return crossed_cells
+
+
+def replot_unit(self, index, cell=None):
+
+    if cell is None:
+        cell = self.unit_plots[index][1]
+
+    if index in self.plot_lines.keys():
+        self.unit_plots[index][0].removeItem(self.plot_lines[index])
+        self.unit_plots[index][0].removeItem(self.avg_plot_lines[index])
+
+    self.plot_lines[index] = MultiLine(
+        np.tile(np.arange(self.samples_per_spike), (self.unit_data[index].shape[0], 1)),
+        self.unit_data[index], pen_color=get_channel_color(cell))
+
+    self.avg_plot_lines[index] = MultiLine(np.arange(self.samples_per_spike).reshape((1, -1)),
+                                           np.mean(self.unit_data[index], axis=0).reshape((1, -1)),
+                                           pen_color='w', pen_width=2)
+
+    self.unit_plots[index][0].addItem(self.plot_lines[index])
+    self.unit_plots[index][0].addItem(self.avg_plot_lines[index])
+
+    self.unit_plots[index][0].setXRange(0, self.samples_per_spike, padding=0)  # set the x-range
+    self.unit_plots[index][0].hideAxis('left')  # remove the y-axis
+    self.unit_plots[index][0].hideAxis('bottom')  # remove the x axis
+    self.unit_plots[index][0].hideButtons()  # hide the auto-resize button
+    self.unit_plots[index][0].setMouseEnabled(x=False, y=False)  # disables the mouse interactions
+
+
+def plot_units(self):
 
     unique_cells = np.unique(self.cut_data)
     # the 0'th cell is the dummy cell for Tint so we will remove that
@@ -209,69 +341,92 @@ def manage_unit_plots(self):
 
     rows, cols = get_grid_dimensions(n_cells)
 
-    if rows != self.unit_rows or self.unit_cols != cols:
+    row = 0
+    col = 0
+    for index in np.arange(len(unique_cells)):
 
-        row = 0
-        col = 0
-        for index in np.arange(len(unique_cells)):
+        cell = unique_cells[index]
 
-            cell = unique_cells[index]
+        if unitMode == 'MatplotWidget':
+            """
+            This is using the matplotlib widget from PyQt, didn't have the greatest performance, leaving it here just
+            for legacy code. Will probably remove it at some point.
+            """
+            self.unit_plots[index] = [self.unit_win.getFigure().add_subplot(int('%d%d%d' % (rows, cols, index+1)))]
+            self.unit_plots[index][0].axis('off')
+        else:
+            self.unit_plots[index] = [self.unit_win.addPlot(row=row,
+                                                           col=col,
+                                                           viewBox=CustomViewBox(self, self.unit_win))]
+            self.vb[index] = self.unit_plots[index][0].vb
 
-            if unitMode == 'MatplotWidget':
-                self.unit_plots[index] = self.unit_win.getFigure().add_subplot(int('%d%d%d' % (rows, cols, index+1)))
-                self.unit_plots[index].axis('off')
-            else:
-                self.unit_plots[index] = self.unit_win.addPlot(row=row, col=col, viewBox=CustomViewBox(self,
-                                                                                                       self.unit_win))
+            # self.unit_drag_lines[index] = pg.LineSegmentROI([[0, 0], [30, 30]])
+            self.unit_drag_lines[index] = pg.PolyLineROI([[0, 0], [30, 30]])
+            self.unit_drag_lines[index].hide()
+            self.unit_plots[index][0].addItem(self.unit_drag_lines[index])
 
-            cell_bool = np.where(self.cut_data == cell)[0]
-            cell_data = self.tetrode_data[:, cell_bool, :]
+            self.vb[index].mouseDragEvent = partial(drag, self, index)  # overriding the drag event
+            self.vb[index].mouseClickEvent = partial(mouse_click_event, self, index)
 
-            if self.samples_per_spike is None:
-                self.samples_per_spike = cell_data.shape[2]
+        cell_bool = np.where(self.cut_data == cell)[0]
+        cell_data = self.tetrode_data[:, cell_bool, :]
 
-            if unitMode == 'MatplotWidget':
-                self.unit_plots[index].plot(cell_data[self.channel].T, 'b')
-                self.unit_plots[index].plot(np.mean(cell_data[self.channel], axis=0), 'k-')
+        if self.samples_per_spike is None:
+            self.samples_per_spike = cell_data.shape[2]
 
-            elif unitMode == 'PyQtDefault':
-                # this uses the default plot() function of a graph
-                self.unit_plots[index].plot(np.mean(cell_data[self.channel], axis=0), pen=get_channel_color(cell))
+        if unitMode == 'MatplotWidget':
+            """
+            This is using the matplotlib widget from PyQt, didn't have the greatest performance, leaving it here just
+            for legacy code. Will probably remove it at some point.
+            """
 
-                self.unit_plots[index].setXRange(0, self.samples_per_spike, padding=0)  # set the x-range
-                self.unit_plots[index].hideAxis('left')  # remove the y-axis
-                self.unit_plots[index].hideAxis('bottom')  # remove the x axis
-                self.unit_plots[index].hideButtons()  # hide the auto-resize button
-                self.unit_plots[index].setMouseEnabled(x=False, y=False)  # disables the mouse interactions
-            else:
+            self.unit_plots[index][0].plot(cell_data[self.channel].T, 'b')
+            self.unit_plots[index][0].plot(np.mean(cell_data[self.channel], axis=0), 'k-')
 
-                self.plot_lines[index] = MultiLine(np.tile(np.arange(self.samples_per_spike), (cell_data[self.channel].shape[0], 1)),
-                                                   cell_data[self.channel], pen=get_channel_color(cell))
+        elif unitMode == 'PyQtDefault':
+            """
+            This is using the generic plot function for PyQt, turns out to be really slow, just keeping it here
+            as legacy code.
+            """
 
-                self.avg_plot_lines[index] = MultiLine(np.arange(self.samples_per_spike).reshape((1, -1)),
-                                                       np.mean(cell_data[self.channel], axis=0).reshape((1, -1)),
-                                                       pen='k')
+            # this uses the default plot() function of a graph
 
-                self.unit_plots[index].addItem(self.plot_lines[index])
-                self.unit_plots[index].addItem(self.avg_plot_lines[index])
+            self.unit_plots[index][0].plot(np.mean(cell_data[self.channel], axis=0), pen=get_channel_color(cell))
 
-                self.unit_plots[index].setXRange(0, self.samples_per_spike, padding=0)  # set the x-range
-                self.unit_plots[index].hideAxis('left')  # remove the y-axis
-                self.unit_plots[index].hideAxis('bottom')  # remove the x axis
-                self.unit_plots[index].hideButtons()  # hide the auto-resize button
-                self.unit_plots[index].setMouseEnabled(x=False, y=False)  # disables the mouse interactions
+            self.unit_plots[index][0].setXRange(0, self.samples_per_spike, padding=0)  # set the x-range
+            self.unit_plots[index][0].hideAxis('left')  # remove the y-axis
+            self.unit_plots[index][0].hideAxis('bottom')  # remove the x axis
+            self.unit_plots[index][0].hideButtons()  # hide the auto-resize button
+            self.unit_plots[index][0].setMouseEnabled(x=False, y=False)  # disables the mouse interactions
+        else:
 
-            col += 1
-            if col >= cols:
-                col = 0
-                row += 1
-        self.unit_rows = rows
-        self.unit_cols = cols
+            self.unit_plots[index].append(cell)
 
-    elif self.unit_cols != cols:
-        pass
-    else:
-        pass
+            self.unit_data[index] = cell_data[self.channel]
+
+            self.plot_lines[index] = MultiLine(np.tile(np.arange(self.samples_per_spike), (cell_data[self.channel].shape[0], 1)),
+                                               cell_data[self.channel], pen_color=get_channel_color(cell))
+
+            self.avg_plot_lines[index] = MultiLine(np.arange(self.samples_per_spike).reshape((1, -1)),
+                                                   np.mean(cell_data[self.channel], axis=0).reshape((1, -1)),
+                                                   pen_color='w', pen_width=2)
+
+            self.unit_plots[index][0].addItem(self.plot_lines[index])
+            self.unit_plots[index][0].addItem(self.avg_plot_lines[index])
+
+            self.unit_plots[index][0].setXRange(0, self.samples_per_spike, padding=0)  # set the x-range
+            self.unit_plots[index][0].hideAxis('left')  # remove the y-axis
+            self.unit_plots[index][0].hideAxis('bottom')  # remove the x axis
+            self.unit_plots[index][0].hideButtons()  # hide the auto-resize button
+            self.unit_plots[index][0].setMouseEnabled(x=False, y=False)  # disables the mouse interactions
+
+        col += 1
+        if col >= cols:
+            col = 0
+            row += 1
+
+    self.unit_rows = rows
+    self.unit_cols = cols
 
 
 def manage_features(self):
@@ -305,7 +460,7 @@ def manage_features(self):
 
             plot_features(self)
 
-            manage_unit_plots(self)
+            plot_units(self)
 
         else:
             # filename does not exist

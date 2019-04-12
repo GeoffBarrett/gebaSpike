@@ -120,12 +120,19 @@ class MultiLine(pg.QtGui.QGraphicsPathItem):
         self.path = pg.arrayToQPath(x.flatten(), y.flatten(), connect.flatten())
         pg.QtGui.QGraphicsPathItem.__init__(self, self.path)
 
-        if 'pen' in kwargs.keys():
-            self.setPen(pg.mkPen(kwargs['pen']))
+        pen_kwargs = {}
+        for kwarg in kwargs:
+            if 'pen_' in kwarg:
+                kwargNew = kwarg.split('pen_')[1]
+                pen_kwargs[kwargNew] = kwargs[kwarg]
+
+        # if 'pen' in kwargs.keys():
+        if len(pen_kwargs) > 0:
+            self.setPen(pg.mkPen(**pen_kwargs))
         else:
             self.setPen(pg.mkPen('w'))
 
-    def shape(self): # override because QGraphicsPathItem.shape is too expensive.
+    def shape(self):  # override because QGraphicsPathItem.shape is too expensive.
         return pg.QtGui.QGraphicsItem.shape(self)
 
     def boundingRect(self):
