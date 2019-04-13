@@ -218,8 +218,6 @@ class MainWindow(QtWidgets.QWidget):
 
         else:
             self.unit_win = pg.GraphicsWindow()
-            # self.unit_win_layout = QtWidgets.QGridLayout()
-            # self.unit_win.setLayout(self.unit_win_layout)
 
         plot_layout = QtWidgets.QHBoxLayout()
         for _object in [self.feature_win, self.unit_win]:

@@ -292,8 +292,9 @@ def find_spikes_crossed(points, unit_data, samples_per_spike=50):
     # calculate the line equation so we can get the points on the line
     slope = getSlope(points)
     y0 = getYIntercept(slope, points[0])
-    dx = np.diff(points, axis=0)[0, 0]  # change in x
-    x = np.arange(dx) + points[0, 0]
+
+    x_values = np.sort(points[:, 0]).flatten()
+    x = np.arange(x_values[0], x_values[1] + 1)
 
     cross_line = slope * x + y0  # equation for the user's line
 

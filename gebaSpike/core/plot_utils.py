@@ -126,7 +126,6 @@ class MultiLine(pg.QtGui.QGraphicsPathItem):
                 kwargNew = kwarg.split('pen_')[1]
                 pen_kwargs[kwargNew] = kwargs[kwarg]
 
-        # if 'pen' in kwargs.keys():
         if len(pen_kwargs) > 0:
             self.setPen(pg.mkPen(**pen_kwargs))
         else:
