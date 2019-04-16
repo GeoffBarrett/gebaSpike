@@ -4,8 +4,6 @@
     <list default="true" id="5c1c0abd-cbce-4393-93b3-90b625a62953" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/plot_functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/plot_functions.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/plot_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/plot_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -18,8 +16,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/core/plot_functions.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="273">
-              <caret line="293" column="40" selection-start-line="293" selection-start-column="40" selection-end-line="293" selection-end-column="40" />
+            <state relative-caret-position="420">
+              <caret line="302" column="32" lean-forward="true" selection-start-line="302" selection-start-column="32" selection-end-line="302" selection-end-column="32" />
               <folding>
                 <element signature="e#0#9#0" expanded="true" />
               </folding>
@@ -30,8 +28,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/core/plot_utils.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="391">
-              <caret line="116" column="63" lean-forward="true" selection-start-line="116" selection-start-column="63" selection-end-line="116" selection-end-column="63" />
+            <state relative-caret-position="1921">
+              <caret line="116" column="63" selection-start-line="116" selection-start-column="63" selection-end-line="116" selection-end-column="63" />
               <folding>
                 <element signature="e#0#22#0" expanded="true" />
               </folding>
@@ -42,7 +40,7 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/core/custom_widgets.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="170">
+            <state relative-caret-position="34">
               <caret line="10" selection-start-line="10" selection-end-line="10" />
               <folding>
                 <element signature="e#0#58#0" expanded="true" />
@@ -65,11 +63,20 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/main.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="188">
-              <caret line="219" column="45" selection-start-line="219" selection-start-column="31" selection-end-line="219" selection-end-column="45" />
+            <state relative-caret-position="273">
+              <caret line="269" column="62" selection-start-line="269" selection-start-column="62" selection-end-line="269" selection-end-column="62" />
               <folding>
                 <element signature="e#0#10#0" expanded="true" />
               </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/core/feature_functions.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="1318">
+              <caret line="136" selection-start-line="136" selection-end-line="136" />
             </state>
           </provider>
         </entry>
@@ -85,8 +92,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>pxMode</find>
-      <find>addPl</find>
       <find>glGridItem</find>
       <find>self.channel_cb</find>
       <find>load_features</find>
@@ -115,6 +120,8 @@
       <find>OpenGl</find>
       <find>GraphicsWindow</find>
       <find>replot</find>
+      <find>find_spikes_crossed</find>
+      <find>samples_per_spike</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -137,7 +144,7 @@
       </list>
     </option>
   </component>
-  <component name="ProjectFrameBounds" extendedState="7">
+  <component name="ProjectFrameBounds" extendedState="6">
     <option name="x" value="512" />
     <option name="y" value="79" />
     <option name="width" value="1278" />
@@ -149,6 +156,7 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
+      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -171,16 +179,10 @@
               <item name="gebaSpike" type="462c0819:PsiDirectoryNode" />
               <item name="img" type="462c0819:PsiDirectoryNode" />
             </path>
-            <path>
-              <item name="gebaSpike" type="b2602c69:ProjectViewProjectNode" />
-              <item name="gebaSpike" type="462c0819:PsiDirectoryNode" />
-              <item name="settings" type="462c0819:PsiDirectoryNode" />
-            </path>
           </expand>
           <select />
         </subPane>
       </pane>
-      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -335,16 +337,16 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
+    <frame x="-8" y="-8" width="1936" height="1176" extended-state="6" />
     <editor active="true" />
     <layout>
-      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.11116965" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.12434141" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.24973656" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" weight="0.32731137" />
       <window_info anchor="bottom" id="Run" order="2" weight="0.32936078" />
-      <window_info active="true" anchor="bottom" id="Debug" order="3" sideWeight="0.4947313" visible="true" weight="0.3033586" />
+      <window_info active="true" anchor="bottom" id="Debug" order="3" sideWeight="0.4947313" visible="true" weight="0.3029722" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" sideWeight="0.49367756" weight="0.32900432" />
@@ -369,9 +371,7 @@
     </breakpoint-manager>
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/settings/settings.json">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
+    <entry file="file://$PROJECT_DIR$/settings/settings.json" />
     <entry file="file://$PROJECT_DIR$/../.gitignore">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="289">
@@ -403,13 +403,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/core/feature_functions.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="221">
-          <caret line="136" selection-start-line="136" selection-end-line="136" />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/../setup.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="204">
@@ -417,197 +410,48 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/graphicsItems/GraphicsItem.py">
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/graphicsItems/GraphicsItem.py" />
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/graphicsItems/GraphicsWidget.py" />
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/widgets/GraphicsView.py" />
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/graphicsItems/PlotItem/PlotItem.py" />
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/graphicsItems/GraphicsLayout.py" />
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/widgets/GraphicsLayoutWidget.py" />
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/graphicsWindows.py" />
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/graphicsItems/ScatterPlotItem.py" />
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/examples/template.py" />
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/examples/relativity_demo.py" />
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/opengl/GLViewWidget.py" />
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/widgets/MatplotlibWidget.py" />
+    <entry file="file://$USER_HOME$/.PyCharmCE2018.3/system/python_stubs/-70813459/PyQt5/QtWidgets/__init__.py" />
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/opengl/GLGraphicsItem.py" />
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/opengl/items/GLMeshItem.py" />
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/opengl/items/GLLinePlotItem.py" />
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/graphicsItems/ROI.py" />
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/examples/ROItypes.py" />
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/examples/GLMeshItem.py" />
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/examples/GLLinePlotItem.py" />
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/opengl/items/GLScatterPlotItem.py" />
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/examples/ROIExamples.py" />
+    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyparsing.py" />
+    <entry file="file://$PROJECT_DIR$/core/plot_utils.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="408">
-          <caret line="30" column="8" lean-forward="true" selection-start-line="30" selection-start-column="8" selection-end-line="30" selection-end-column="8" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/graphicsItems/GraphicsWidget.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="357">
-          <caret line="23" column="41" lean-forward="true" selection-start-line="23" selection-start-column="41" selection-end-line="23" selection-end-column="41" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/widgets/GraphicsView.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="443">
-          <caret line="194" column="29" selection-start-line="194" selection-start-column="29" selection-end-line="194" selection-end-column="29" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/graphicsItems/PlotItem/PlotItem.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-9945">
-          <caret line="15" column="74" lean-forward="true" selection-start-line="15" selection-start-column="74" selection-end-line="15" selection-end-column="74" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/graphicsItems/GraphicsLayout.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="255">
-          <caret line="15" selection-start-line="15" selection-end-line="15" />
-          <folding>
-            <element signature="e#0#30#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/widgets/GraphicsLayoutWidget.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="354">
-          <caret line="21" column="58" selection-start-line="21" selection-start-column="58" selection-end-line="21" selection-end-column="58" />
+        <state relative-caret-position="1921">
+          <caret line="116" column="63" selection-start-line="116" selection-start-column="63" selection-end-line="116" selection-end-column="63" />
           <folding>
             <element signature="e#0#22#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/graphicsWindows.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="374">
-          <caret line="22" column="57" selection-start-line="22" selection-start-column="57" selection-end-line="22" selection-end-column="57" />
-          <folding>
-            <element signature="e#235#264#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/graphicsItems/ScatterPlotItem.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="425">
-          <caret line="613" column="21" selection-start-line="613" selection-start-column="21" selection-end-line="613" selection-end-column="21" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/examples/template.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="221">
-          <caret line="17" column="74" lean-forward="true" selection-start-line="17" selection-start-column="74" selection-end-line="17" selection-end-column="74" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/examples/relativity_demo.py">
+    <entry file="file://$PROJECT_DIR$/core/custom_widgets.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="34">
-          <caret line="2" column="19" selection-start-line="2" selection-start-column="19" selection-end-line="2" selection-end-column="19" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/opengl/GLViewWidget.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="593">
-          <caret line="40" column="36" lean-forward="true" selection-start-line="40" selection-start-column="36" selection-end-line="40" selection-end-column="36" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/widgets/MatplotlibWidget.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="612">
-          <caret line="36" column="50" selection-start-line="36" selection-start-column="50" selection-end-line="36" selection-end-column="50" />
+          <caret line="10" selection-start-line="10" selection-end-line="10" />
           <folding>
-            <element signature="e#0#53#0" expanded="true" />
+            <element signature="e#0#58#0" expanded="true" />
+            <element signature="e#422#45538#0" />
+            <element signature="e#45575#54810#0" />
           </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$USER_HOME$/.PyCharmCE2018.3/system/python_stubs/-70813459/PyQt5/QtWidgets/__init__.py">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/opengl/GLGraphicsItem.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="578">
-          <caret line="38" column="8" selection-start-line="36" selection-start-column="19" selection-end-line="36" selection-end-column="33" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/opengl/items/GLMeshItem.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="136">
-          <caret line="14" column="8" selection-start-line="14" selection-start-column="8" selection-end-line="14" selection-end-column="8" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/opengl/items/GLLinePlotItem.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="272">
-          <caret line="21" column="17" selection-start-line="21" selection-start-column="17" selection-end-line="21" selection-end-column="17" />
-          <folding>
-            <element signature="e#2276#2280#0" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/graphicsItems/ROI.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="323">
-          <caret line="19" selection-start-line="19" selection-end-line="19" selection-end-column="25" />
-          <folding>
-            <element signature="e#7160#7319#0" />
-            <element signature="e#8130#8236#0" />
-            <element signature="e#8520#8752#0" />
-            <element signature="e#53611#63253#0" />
-            <element signature="e#68337#68375#0" />
-            <element signature="e#68431#68470#0" />
-            <element signature="e#68522#68781#0" />
-            <element signature="e#68864#69569#0" />
-            <element signature="e#69659#71151#0" />
-            <element signature="e#71207#71606#0" />
-            <element signature="e#72766#73048#0" />
-            <element signature="e#73132#74037#0" />
-            <element signature="e#74231#75032#0" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/examples/ROItypes.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="238">
-          <caret line="19" selection-start-line="19" selection-end-line="19" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/examples/GLMeshItem.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="289">
-          <caret line="21" column="12" selection-start-line="21" selection-start-column="12" selection-end-line="21" selection-end-column="12" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/examples/GLLinePlotItem.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="238">
-          <caret line="19" column="20" selection-start-line="19" selection-start-column="20" selection-end-line="19" selection-end-column="20" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/opengl/items/GLScatterPlotItem.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="34">
-          <caret line="2" column="41" selection-start-line="2" selection-start-column="41" selection-end-line="2" selection-end-column="41" />
-          <folding>
-            <element signature="e#717#2191#0" />
-            <element signature="e#2238#3064#0" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/examples/ROIExamples.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="748">
-          <caret line="48" column="18" selection-start-line="48" selection-start-column="18" selection-end-line="48" selection-end-column="18" />
-          <folding>
-            <element signature="e#243#326#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyparsing.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="206">
-          <caret line="3567" selection-start-line="3567" selection-end-line="3567" />
         </state>
       </provider>
     </entry>
@@ -618,42 +462,27 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/core/feature_functions.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1318">
+          <caret line="136" selection-start-line="136" selection-end-line="136" />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/main.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="188">
-          <caret line="219" column="45" selection-start-line="219" selection-start-column="31" selection-end-line="219" selection-end-column="45" />
+        <state relative-caret-position="273">
+          <caret line="269" column="62" selection-start-line="269" selection-start-column="62" selection-end-line="269" selection-end-column="62" />
           <folding>
             <element signature="e#0#10#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/core/custom_widgets.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="170">
-          <caret line="10" selection-start-line="10" selection-end-line="10" />
-          <folding>
-            <element signature="e#0#58#0" expanded="true" />
-            <element signature="e#422#45538#0" />
-            <element signature="e#45575#54810#0" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/core/plot_utils.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="391">
-          <caret line="116" column="63" lean-forward="true" selection-start-line="116" selection-start-column="63" selection-end-line="116" selection-end-column="63" />
-          <folding>
-            <element signature="e#0#22#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/core/plot_functions.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="273">
-          <caret line="293" column="40" selection-start-line="293" selection-start-column="40" selection-end-line="293" selection-end-column="40" />
+        <state relative-caret-position="420">
+          <caret line="302" column="32" lean-forward="true" selection-start-line="302" selection-start-column="32" selection-end-line="302" selection-end-column="32" />
           <folding>
             <element signature="e#0#9#0" expanded="true" />
           </folding>

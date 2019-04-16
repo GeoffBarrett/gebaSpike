@@ -278,7 +278,7 @@ def mouse_click_event(self, index, ev=None):
 
             unit_data = self.unit_data[index]
 
-            crossed_cells = find_spikes_crossed(points, unit_data)
+            crossed_cells = find_spikes_crossed(points, unit_data, samples_per_spike=self.samples_per_spike)
 
             self.unit_data[index] = np.delete(unit_data, crossed_cells, axis=0)
 
@@ -294,7 +294,15 @@ def find_spikes_crossed(points, unit_data, samples_per_spike=50):
     y0 = getYIntercept(slope, points[0])
 
     x_values = np.sort(points[:, 0]).flatten()
-    x = np.arange(x_values[0], x_values[1] + 1)
+
+    start = x_values[0]; stop = x_values[1] + 1
+    if start < 0:
+        start = 0
+
+    if stop > samples_per_spike:
+        stop = samples_per_spike
+
+    x = np.arange(start, stop)
 
     cross_line = slope * x + y0  # equation for the user's line
 
