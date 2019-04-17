@@ -57,6 +57,12 @@ class MainWindow(QtWidgets.QWidget):
         self.yline = None
         self.zline = None
 
+        self.n_channels = None
+
+        self.invalid_channel = None
+
+        self.cell_indices = {}
+
         self.spike_colors = None
 
         self.channel = None
@@ -288,6 +294,8 @@ class MainWindow(QtWidgets.QWidget):
 
         # center(self)  # centering the window
 
+        self.invalid_channel = 0
+
         self.show()  # shows the window
 
     def close_app(self):
@@ -358,9 +366,10 @@ class MainWindow(QtWidgets.QWidget):
         self.tetrode_data = None
         self.cut_data = None
         self.cut_data_original = None
+        self.n_channels = None
         self.spike_times = None
         self.scatterItem = None
-
+        self.cell_indices = {}
         self.plot_lines = {}
         self.avg_plot_lines = {}
         self.vb = {}

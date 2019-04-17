@@ -1,7 +1,7 @@
 import os
 import time
 import numpy as np
-from core.default_parameters import openGL, gridLines, feature_spike_opacity, feature_spike_size, unitMode
+from core.default_parameters import openGL, gridLines, feature_spike_opacity, feature_spike_size, unitMode, channel_range
 from core.gui_utils import validate_session
 from core.Tint_Matlab import find_unit, getspikes
 from core.feature_functions import CreateFeatures
@@ -276,16 +276,71 @@ def mouse_click_event(self, index, ev=None):
             # we will get the x,y positions (rounded to the nearest int) of the selected line
             points = np.rint(np.asarray(self.unit_drag_lines[index].getState()['points']))
 
-            unit_data = self.unit_data[index]
+            # find which channel the user started in
+            channel = get_channel_from_y(points[0, 1], channel_range=channel_range, n_channels=self.n_channels)
 
-            crossed_cells = find_spikes_crossed(points, unit_data)
+            unit_data = self.unit_data[index][channel]
 
-            self.unit_data[index] = np.delete(unit_data, crossed_cells, axis=0)
+            crossed_cells = find_spikes_crossed(points, unit_data, samples_per_spike=self.samples_per_spike)
 
-            replot_unit(self, index)
+            # remove these spikes from all the channels
+            for channel in np.arange(self.n_channels):
+                self.unit_data[index][channel] = np.delete(self.unit_data[index][channel], crossed_cells, axis=0)
+
+            # update the bool
+            cell = self.unit_plots[index][1]
+            cell_indices = self.cell_indices[cell]
+            new_cell_indices = np.delete(cell_indices, crossed_cells)
+            self.cell_indices[cell] = new_cell_indices
+
+            # append invalid cells to the new cell number
+            invalid_cells = cell_indices[crossed_cells]
+
+            reconfigure = False
+            if cell in self.cell_indices.keys():
+                self.cell_indices[cell] = np.sort(np.concatenate((self.cell_indices[cell], invalid_cells)))
+            else:
+                self.cell_indices[cell] = invalid_cells
+                reconfigure = True
+
+            if not reconfigure:
+                # update plots for the invalid cell and the
+                replot_unit(self, index)
+
+                invalid_index = get_index_from_cell(self, cell)
+
+                if invalid_index is not None:
+                    replot_unit(self, invalid_index)
+            else:
+                pass
 
             self.unit_drag_lines[index].hide()
             self.active_ROI.remove(self.unit_drag_lines[index])
+
+
+def get_index_from_cell(self, cell):
+
+    for index, value in self.unit_plots.items():
+        if len(value) == 1:
+            continue
+        else:
+            if value[1] == cell:
+                return index
+    return None
+
+
+def get_channel_y_edges(channel_range=256, n_channels=4):
+    return np.arange(n_channels + 1) * -channel_range
+
+
+def get_channel_from_y(y_value, channel_range=256, n_channels=4):
+    """Get the channel to look for the line crossing in"""
+    edges = get_channel_y_edges(channel_range=channel_range, n_channels=n_channels)
+
+    for channel in np.arange(n_channels):
+        if edges[channel] >= y_value >= edges[channel+1]:
+            return channel
+    return None
 
 
 def find_spikes_crossed(points, unit_data, samples_per_spike=50):
@@ -294,7 +349,15 @@ def find_spikes_crossed(points, unit_data, samples_per_spike=50):
     y0 = getYIntercept(slope, points[0])
 
     x_values = np.sort(points[:, 0]).flatten()
-    x = np.arange(x_values[0], x_values[1] + 1)
+
+    start = x_values[0]; stop = x_values[1] + 1
+    if start < 0:
+        start = 0
+
+    if stop > samples_per_spike:
+        stop = samples_per_spike
+
+    x = np.arange(start, stop)
 
     cross_line = slope * x + y0  # equation for the user's line
 
@@ -312,23 +375,29 @@ def reload_cut(self, index):
 
 def replot_unit(self, index, cell=None):
 
+    if cell == 0:
+        return
+
+    # get the cell for the color
     if cell is None:
         cell = self.unit_plots[index][1]
 
-    if index in self.plot_lines.keys():
-        self.unit_plots[index][0].removeItem(self.plot_lines[index])
-        self.unit_plots[index][0].removeItem(self.avg_plot_lines[index])
+    for channel in np.arange(self.n_channels):
+        if index in self.plot_lines.keys():
+            # self.unit_plots[index] is list where the 0'th index is the plot
+            self.unit_plots[index][0].removeItem(self.plot_lines[index][channel])
+            self.unit_plots[index][0].removeItem(self.avg_plot_lines[index][channel])
 
-    self.plot_lines[index] = MultiLine(
-        np.tile(np.arange(self.samples_per_spike), (self.unit_data[index].shape[0], 1)),
-        self.unit_data[index], pen_color=get_channel_color(cell))
+        self.plot_lines[index][channel] = MultiLine(
+            np.tile(np.arange(self.samples_per_spike), (self.unit_data[index][channel].shape[0], 1)),
+            self.unit_data[index][channel], pen_color=get_channel_color(cell))
 
-    self.avg_plot_lines[index] = MultiLine(np.arange(self.samples_per_spike).reshape((1, -1)),
-                                           np.mean(self.unit_data[index], axis=0).reshape((1, -1)),
-                                           pen_color='w', pen_width=2)
+        self.avg_plot_lines[index][channel] = MultiLine(np.arange(self.samples_per_spike).reshape((1, -1)),
+                                               np.mean(self.unit_data[index][channel], axis=0).reshape((1, -1)),
+                                               pen_color='w', pen_width=2)
 
-    self.unit_plots[index][0].addItem(self.plot_lines[index])
-    self.unit_plots[index][0].addItem(self.avg_plot_lines[index])
+        self.unit_plots[index][0].addItem(self.plot_lines[index][channel])
+        self.unit_plots[index][0].addItem(self.avg_plot_lines[index][channel])
 
     self.unit_plots[index][0].setXRange(0, self.samples_per_spike, padding=0)  # set the x-range
     self.unit_plots[index][0].hideAxis('left')  # remove the y-axis
@@ -337,12 +406,19 @@ def replot_unit(self, index, cell=None):
     self.unit_plots[index][0].setMouseEnabled(x=False, y=False)  # disables the mouse interactions
 
 
+def add_graph_limits():
+    pass
+
+
 def plot_units(self):
 
     unique_cells = np.unique(self.cut_data)
     # the 0'th cell is the dummy cell for Tint so we will remove that
 
     unique_cells = unique_cells[unique_cells != 0]
+
+    self.cell_indices[0] = np.where(self.cut_data == 0)[0]
+
     n_cells = len(unique_cells)
 
     rows, cols = get_grid_dimensions(n_cells)
@@ -361,9 +437,8 @@ def plot_units(self):
             self.unit_plots[index] = [self.unit_win.getFigure().add_subplot(int('%d%d%d' % (rows, cols, index+1)))]
             self.unit_plots[index][0].axis('off')
         else:
-            self.unit_plots[index] = [self.unit_win.addPlot(row=row,
-                                                           col=col,
-                                                           viewBox=CustomViewBox(self, self.unit_win))]
+            self.unit_plots[index] = [self.unit_win.addPlot(row=row, col=col,
+                                                            viewBox=CustomViewBox(self, self.unit_win))]
             self.vb[index] = self.unit_plots[index][0].vb
 
             # self.unit_drag_lines[index] = pg.LineSegmentROI([[0, 0], [30, 30]])
@@ -380,6 +455,10 @@ def plot_units(self):
         if self.samples_per_spike is None:
             self.samples_per_spike = cell_data.shape[2]
 
+        if self.n_channels is None:
+            self.n_channels = cell_data.shape[0]
+
+        '''
         if unitMode == 'MatplotWidget':
             """
             This is using the matplotlib widget from PyQt, didn't have the greatest performance, leaving it here just
@@ -405,27 +484,54 @@ def plot_units(self):
             self.unit_plots[index][0].hideButtons()  # hide the auto-resize button
             self.unit_plots[index][0].setMouseEnabled(x=False, y=False)  # disables the mouse interactions
         else:
+        '''
 
-            self.unit_plots[index].append(cell)
+        # appending hte cell number to the unit_plots list so we know which cell refers to which plot
+        self.unit_plots[index].append(cell)
 
-            self.unit_data[index] = cell_data[self.channel]
+        channel_max = np.amax(cell_data[0])
 
-            self.plot_lines[index] = MultiLine(np.tile(np.arange(self.samples_per_spike), (cell_data[self.channel].shape[0], 1)),
-                                               cell_data[self.channel], pen_color=get_channel_color(cell))
+        self.cell_indices[cell] = cell_bool
 
-            self.avg_plot_lines[index] = MultiLine(np.arange(self.samples_per_spike).reshape((1, -1)),
-                                                   np.mean(cell_data[self.channel], axis=0).reshape((1, -1)),
-                                                   pen_color='w', pen_width=2)
+        for channel in np.arange(self.n_channels):
+            # we will keep the data and the indices
 
-            self.unit_plots[index][0].addItem(self.plot_lines[index])
-            self.unit_plots[index][0].addItem(self.avg_plot_lines[index])
+            # shifting the data so that the next channel resides below the previous
+            # also making the 1st channel start at a y value of 0
+            plot_data = cell_data[channel] - channel*channel_range - channel_max
 
-            self.unit_plots[index][0].setXRange(0, self.samples_per_spike, padding=0)  # set the x-range
-            self.unit_plots[index][0].hideAxis('left')  # remove the y-axis
-            self.unit_plots[index][0].hideAxis('bottom')  # remove the x axis
-            self.unit_plots[index][0].hideButtons()  # hide the auto-resize button
-            self.unit_plots[index][0].setMouseEnabled(x=False, y=False)  # disables the mouse interactions
+            if index not in self.unit_data.keys():
+                self.unit_data[index] = {channel: plot_data}
+            else:
+                self.unit_data[index][channel] = plot_data
 
+            if index not in self.plot_lines.keys():
+
+                self.plot_lines[index] = {channel: MultiLine(np.tile(np.arange(self.samples_per_spike), (plot_data.shape[0], 1)),
+                                                   plot_data, pen_color=get_channel_color(cell))}
+            else:
+                self.plot_lines[index][channel] = MultiLine(np.tile(np.arange(self.samples_per_spike), (plot_data.shape[0], 1)),
+                                       plot_data, pen_color=get_channel_color(cell))
+
+            if index not in self.avg_plot_lines.keys():
+                self.avg_plot_lines[index] = {channel: MultiLine(np.arange(self.samples_per_spike).reshape((1, -1)),
+                                                       np.mean(plot_data, axis=0).reshape((1, -1)),
+                                                       pen_color='w', pen_width=2)}
+            else:
+                self.avg_plot_lines[index][channel] = MultiLine(np.arange(self.samples_per_spike).reshape((1, -1)),
+                                                                 np.mean(plot_data, axis=0).reshape((1, -1)),
+                                                                 pen_color='w', pen_width=2)
+
+            self.unit_plots[index][0].addItem(self.plot_lines[index][channel])
+            self.unit_plots[index][0].addItem(self.avg_plot_lines[index][channel])
+
+        self.unit_plots[index][0].setXRange(0, self.samples_per_spike, padding=0)  # set the x-range
+        self.unit_plots[index][0].setYRange(0, -self.n_channels*channel_range, padding=0)
+        self.unit_plots[index][0].hideAxis('left')  # remove the y-axis
+        self.unit_plots[index][0].hideAxis('bottom')  # remove the x axis
+        self.unit_plots[index][0].hideButtons()  # hide the auto-resize button
+        self.unit_plots[index][0].setMouseEnabled(x=False, y=False)  # disables the mouse interactions
+        self.unit_plots[index][0].setDownsampling(mode='peak')
         col += 1
         if col >= cols:
             col = 0
