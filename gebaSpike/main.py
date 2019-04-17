@@ -2,7 +2,7 @@ import sys
 import pyqtgraph as pg
 from PyQt5 import QtCore, QtGui, QtWidgets
 from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
-from core.gui_utils import center, validate_session, Communicate
+from core.gui_utils import center, validate_session, Communicate, validate_cut
 from core.default_parameters import project_name, default_filename, defaultXAxis, defaultYAxis, defaultZAxis, openGL, \
 unitMode
 from core.Tint_Matlab import find_tet
@@ -24,6 +24,8 @@ class MainWindow(QtWidgets.QWidget):
         self.setWindowTitle("%s - Main Window" % project_name)  # sets the main window title
 
         # initializing attributes
+        self.cut_filename = None
+        self.choose_cut_filename_btn = None
         self.feature_win = None
         self.quit_btn = None
         self.filename = None
@@ -56,6 +58,8 @@ class MainWindow(QtWidgets.QWidget):
         self.zline = None
 
         self.spike_colors = None
+
+        self.channel = None
 
         self.unit_plots = {}
         self.vb = {}
@@ -110,7 +114,7 @@ class MainWindow(QtWidgets.QWidget):
 
         # ---------------- session filename options ------------------------------------------
 
-        filename_layout = QtWidgets.QHBoxLayout()
+        filename_grid_layout = QtWidgets.QGridLayout()
 
         filename_label = QtWidgets.QLabel("Filename:")
         self.filename = QtWidgets.QLineEdit()
@@ -120,8 +124,29 @@ class MainWindow(QtWidgets.QWidget):
         self.choose_filename_btn = QtWidgets.QPushButton("Choose Filename")
         self.choose_filename_btn.setToolTip('This button will allow you to choose the filename to analyze!')
         self.choose_filename_btn.clicked.connect(self.choose_filename)
-        for widget in [self.choose_filename_btn, filename_label, self.filename]:
-            filename_layout.addWidget(widget)
+
+        filename_grid_layout.addWidget(self.choose_filename_btn, *(0, 0))
+        filename_grid_layout.addWidget(filename_label, *(0, 1), QtCore.Qt.AlignRight)
+
+        # ------------------- cut filename options ---------------------------------
+
+        cut_filename_label = QtWidgets.QLabel("Cut Filename:")
+        self.cut_filename = QtWidgets.QLineEdit()
+        self.cut_filename.setText(default_filename)
+        self.cut_filename.textChanged.connect(self.cut_filename_changed)
+        self.cut_filename.setToolTip('The name of the cut file containing the sorted values!')
+        self.choose_cut_filename_btn = QtWidgets.QPushButton("Choose Cut Filename")
+        self.choose_cut_filename_btn.setToolTip('This button will allow you to choose a cut file to use!')
+        self.choose_cut_filename_btn.clicked.connect(self.choose_cut_filename)
+
+        line_edit_layout = QtWidgets.QVBoxLayout()
+        line_edit_layout.addWidget(self.cut_filename)
+        line_edit_layout.addWidget(self.filename)
+
+        filename_grid_layout.addWidget(self.choose_cut_filename_btn, *(1, 0))
+        filename_grid_layout.addWidget(cut_filename_label, *(1, 1), QtCore.Qt.AlignRight)
+
+        filename_grid_layout.addLayout(line_edit_layout, *(0, 2), 2, 1)
 
         # -------- spike parameter options -------------------------------------
 
@@ -242,7 +267,7 @@ class MainWindow(QtWidgets.QWidget):
 
         main_window_layout = QtWidgets.QVBoxLayout()
 
-        layout_order = [filename_layout, spike_parameter_layout, plot_layout, button_layout]
+        layout_order = [filename_grid_layout, spike_parameter_layout, plot_layout, button_layout]
         add_Stretch = [False, False, False, False]
         # ---------------- add all the layouts and widgets to the Main Window's layout ------------ #
 
@@ -300,6 +325,15 @@ class MainWindow(QtWidgets.QWidget):
                                                          " ensure that the appropriate files exist for this session.",
                                                          QtWidgets.QMessageBox.Ok)
 
+        elif 'InvalidCut' in error:
+
+            session = error.split('!')[1]
+            self.choice = QtWidgets.QMessageBox.question(self, "Invalid Cut/Clu Filename!",
+                                                         "The following Cut filename is invalid: \n%s\nPlease" %
+                                                         session +
+                                                         " ensure that this .cut/clu filename belongs to this session!",
+                                                         QtWidgets.QMessageBox.Ok)
+
         elif 'ChooseSession' in error:
 
             self.choice = QtWidgets.QMessageBox.question(self, "Choose Session Filename!",
@@ -342,6 +376,43 @@ class MainWindow(QtWidgets.QWidget):
         self.unit_rows = 0
         self.unit_cols = 0
 
+    def choose_cut_filename(self):
+        if 'file_directory' not in self.settings.keys():
+            current_filename, filename_filter = QtWidgets.QFileDialog.getOpenFileName(
+                self, caption="Select a '.Set' file!", directory='', filter='Set Files (*.set)')
+
+        else:
+            if os.path.exists(self.settings['file_directory']):
+                current_filename, filename_filter = QtWidgets.QFileDialog.getOpenFileName(
+                    self, caption="Select a '.Cut/.Clu' file!", directory=self.settings['file_directory'],
+                    filter='Cut Files (*.cut, *.clu*)')
+            else:
+                current_filename, filename_filter = QtWidgets.QFileDialog.getOpenFileName(
+                    self, caption="Select a '.Cut/.Clu' file!", directory='', filter='Cut Files (*.cut, *.clu*)')
+
+        # if no file chosen, skip
+        if current_filename == '':
+            return
+
+        chosen_directory = os.path.dirname(current_filename)
+
+        self.settings['file_directory'] = chosen_directory
+
+        self.overwrite_settings()
+
+        cut_valid, error_raised = validate_cut(self, self.filename.text(), current_filename)
+
+        if cut_valid:
+            # replace the current .cut field in the choose .cut field with chosen filename
+            self.cut_filename.setText(current_filename)
+
+        else:
+            if not error_raised:
+                self.choice = None
+                self.LogError.signal.emit('InvalidCut!%s' % current_filename)
+                while self.choice is None:
+                    time.sleep(0.1)
+
     def choose_filename(self):
         """
         This method will allow you to choose a filename to analyze.
@@ -374,7 +445,7 @@ class MainWindow(QtWidgets.QWidget):
         session_valid, error_raised = validate_session(self, current_filename)
 
         if session_valid:
-            # replace the current .set field in the choose .set window with chosen filename
+            # replace the current .set field in the choose .set field with chosen filename
             self.filename.setText(current_filename)
             self.reset_parameters()
 
@@ -385,10 +456,27 @@ class MainWindow(QtWidgets.QWidget):
                 while self.choice is None:
                     time.sleep(0.1)
 
+    def cut_filename_changed(self):
+        """
+        This method will run when the cut filename LineEdit has been changed
+        """
+        filename = self.filename.text()
+        if os.path.exists(filename):
+            self.tetrode_cb.clear()
+
+            tetrode_path, tetrode_list = find_tet(self.filename.text())
+
+            for file in tetrode_list:
+                tetrode = os.path.splitext(file)[-1][1:]
+                self.tetrode_cb.addItem(tetrode)
+
     def filename_changed(self):
         """
-        This method will run when the filename LineEdit has been changed
+        This method will run when the filename LineEdit has been changed.
+
+        It will essentially find the active tetrodes and populate the drop-down menu.
         """
+
         filename = self.filename.text()
         if os.path.exists(filename):
             self.tetrode_cb.clear()

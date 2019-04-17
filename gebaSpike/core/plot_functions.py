@@ -305,6 +305,11 @@ def find_spikes_crossed(points, unit_data, samples_per_spike=50):
     return crossed_cells
 
 
+def reload_cut(self, index):
+
+    self.unit_win.clear()
+
+
 def replot_unit(self, index, cell=None):
 
     if cell is None:

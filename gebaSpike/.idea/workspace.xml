@@ -3,8 +3,8 @@
   <component name="ChangeListManager">
     <list default="true" id="5c1c0abd-cbce-4393-93b3-90b625a62953" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/gui_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/gui_utils.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/plot_functions.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/plot_functions.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/plot_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/plot_utils.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -15,11 +15,11 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/core/plot_functions.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="273">
-              <caret line="293" column="40" selection-start-line="293" selection-start-column="40" selection-end-line="293" selection-end-column="40" />
+            <state relative-caret-position="528">
+              <caret line="323" column="26" selection-start-line="323" selection-start-column="26" selection-end-line="323" selection-end-column="26" />
               <folding>
                 <element signature="e#0#9#0" expanded="true" />
               </folding>
@@ -30,8 +30,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/core/plot_utils.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="391">
-              <caret line="116" column="63" lean-forward="true" selection-start-line="116" selection-start-column="63" selection-end-line="116" selection-end-column="63" />
+            <state relative-caret-position="1921">
+              <caret line="116" column="63" selection-start-line="116" selection-start-column="63" selection-end-line="116" selection-end-column="63" />
               <folding>
                 <element signature="e#0#22#0" expanded="true" />
               </folding>
@@ -42,7 +42,7 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/core/custom_widgets.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="170">
+            <state relative-caret-position="34">
               <caret line="10" selection-start-line="10" selection-end-line="10" />
               <folding>
                 <element signature="e#0#58#0" expanded="true" />
@@ -62,13 +62,25 @@
           </provider>
         </entry>
       </file>
-      <file pinned="false" current-in-tab="false">
+      <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/main.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="188">
-              <caret line="219" column="45" selection-start-line="219" selection-start-column="31" selection-end-line="219" selection-end-column="45" />
+            <state relative-caret-position="-4711">
+              <caret line="134" column="51" selection-start-line="134" selection-start-column="51" selection-end-line="134" selection-end-column="51" />
               <folding>
                 <element signature="e#0#10#0" expanded="true" />
+              </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/core/gui_utils.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="326">
+              <caret line="54" column="22" selection-start-line="54" selection-start-column="22" selection-end-line="54" selection-end-column="22" />
+              <folding>
+                <element signature="e#0#35#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -85,8 +97,6 @@
   </component>
   <component name="FindInProjectRecents">
     <findStrings>
-      <find>pxMode</find>
-      <find>addPl</find>
       <find>glGridItem</find>
       <find>self.channel_cb</find>
       <find>load_features</find>
@@ -115,6 +125,8 @@
       <find>OpenGl</find>
       <find>GraphicsWindow</find>
       <find>replot</find>
+      <find>va</find>
+      <find>validate_session</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -125,21 +137,21 @@
       <list>
         <option value="$PROJECT_DIR$/core/Tint_Matlab.py" />
         <option value="$PROJECT_DIR$/core/feature_functions.py" />
-        <option value="$PROJECT_DIR$/core/gui_utils.py" />
         <option value="$PROJECT_DIR$/../.gitignore" />
         <option value="$PROJECT_DIR$/../setup.py" />
         <option value="$PROJECT_DIR$/../../virtual_environments/gebaSpike/Lib/site-packages/pyqtgraph/examples/GLMeshItem.py" />
         <option value="$PROJECT_DIR$/core/custom_widgets.py" />
         <option value="$PROJECT_DIR$/core/default_parameters.py" />
-        <option value="$PROJECT_DIR$/main.py" />
         <option value="$PROJECT_DIR$/core/plot_utils.py" />
         <option value="$PROJECT_DIR$/core/plot_functions.py" />
+        <option value="$PROJECT_DIR$/core/gui_utils.py" />
+        <option value="$PROJECT_DIR$/main.py" />
       </list>
     </option>
   </component>
-  <component name="ProjectFrameBounds" extendedState="7">
-    <option name="x" value="512" />
-    <option name="y" value="79" />
+  <component name="ProjectFrameBounds" extendedState="6">
+    <option name="x" value="-56" />
+    <option name="y" value="128" />
     <option name="width" value="1278" />
     <option name="height" value="991" />
   </component>
@@ -184,7 +196,7 @@
     </panes>
   </component>
   <component name="PropertiesComponent">
-    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/../../CUMC/Python/BatchTINTV3/BatchTINTV3" />
     <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
   </component>
   <component name="RecentsManager">
@@ -344,7 +356,7 @@
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" weight="0.32731137" />
       <window_info anchor="bottom" id="Run" order="2" weight="0.32936078" />
-      <window_info active="true" anchor="bottom" id="Debug" order="3" sideWeight="0.4947313" visible="true" weight="0.3033586" />
+      <window_info anchor="bottom" id="Debug" order="3" sideWeight="0.4947313" weight="0.3033586" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
       <window_info anchor="bottom" id="TODO" order="6" sideWeight="0.49367756" weight="0.32900432" />
@@ -382,16 +394,6 @@
     <entry file="file://$PROJECT_DIR$/../../../CUMC/Python/BatchTINTV3/setup.py" />
     <entry file="file://$PROJECT_DIR$/img/__init__.py">
       <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/core/gui_utils.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="612">
-          <caret line="38" column="7" selection-start-line="38" selection-start-column="7" selection-end-line="38" selection-end-column="7" />
-          <folding>
-            <element signature="e#0#35#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/core/Tint_Matlab.py">
       <provider selected="true" editor-type-id="text-editor">
@@ -611,26 +613,29 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/core/default_parameters.py">
+    <entry file="file://$PROJECT_DIR$/core/plot_functions.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="306">
-          <caret line="18" selection-start-line="18" selection-end-line="18" />
+        <state relative-caret-position="528">
+          <caret line="323" column="26" selection-start-line="323" selection-start-column="26" selection-end-line="323" selection-end-column="26" />
+          <folding>
+            <element signature="e#0#9#0" expanded="true" />
+          </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/main.py">
+    <entry file="file://$PROJECT_DIR$/core/plot_utils.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="188">
-          <caret line="219" column="45" selection-start-line="219" selection-start-column="31" selection-end-line="219" selection-end-column="45" />
+        <state relative-caret-position="1921">
+          <caret line="116" column="63" selection-start-line="116" selection-start-column="63" selection-end-line="116" selection-end-column="63" />
           <folding>
-            <element signature="e#0#10#0" expanded="true" />
+            <element signature="e#0#22#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/core/custom_widgets.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="170">
+        <state relative-caret-position="34">
           <caret line="10" selection-start-line="10" selection-end-line="10" />
           <folding>
             <element signature="e#0#58#0" expanded="true" />
@@ -640,22 +645,29 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/core/plot_utils.py">
+    <entry file="file://$PROJECT_DIR$/core/default_parameters.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="391">
-          <caret line="116" column="63" lean-forward="true" selection-start-line="116" selection-start-column="63" selection-end-line="116" selection-end-column="63" />
+        <state relative-caret-position="306">
+          <caret line="18" selection-start-line="18" selection-end-line="18" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/core/gui_utils.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="326">
+          <caret line="54" column="22" selection-start-line="54" selection-start-column="22" selection-end-line="54" selection-end-column="22" />
           <folding>
-            <element signature="e#0#22#0" expanded="true" />
+            <element signature="e#0#35#0" expanded="true" />
           </folding>
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/core/plot_functions.py">
+    <entry file="file://$PROJECT_DIR$/main.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="273">
-          <caret line="293" column="40" selection-start-line="293" selection-start-column="40" selection-end-line="293" selection-end-column="40" />
+        <state relative-caret-position="-4711">
+          <caret line="134" column="51" selection-start-line="134" selection-start-column="51" selection-end-line="134" selection-end-column="51" />
           <folding>
-            <element signature="e#0#9#0" expanded="true" />
+            <element signature="e#0#10#0" expanded="true" />
           </folding>
         </state>
       </provider>
