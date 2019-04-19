@@ -4,8 +4,8 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
 from core.gui_utils import center, validate_session, Communicate, validate_cut
 from core.default_parameters import project_name, default_filename, defaultXAxis, defaultYAxis, defaultZAxis, openGL, \
-unitMode
-from core.Tint_Matlab import find_tet
+unitMode, default_move_channel
+from core.Tint_Matlab import find_tetrodes
 from core.plot_functions import manage_features, feature_name_map
 # from core.plot_utils import CustomViewBox, PltWidget
 import pyqtgraph.opengl as gl
@@ -38,6 +38,8 @@ class MainWindow(QtWidgets.QWidget):
         self.plot_btn = None
         self.feature_plot = None
 
+        self.drag_active = False
+
         self.feature_data = None
         self.tetrode_data = None
         self.cut_data = None
@@ -45,7 +47,6 @@ class MainWindow(QtWidgets.QWidget):
         self.spike_times = None
         self.scatterItem = None
         self.glViewWidget = None
-        self.channel_cb = None
         self.feature_plot_added = False
         self.samples_per_spike = None
 
@@ -64,8 +65,6 @@ class MainWindow(QtWidgets.QWidget):
         self.cell_indices = {}
 
         self.spike_colors = None
-
-        self.channel = None
 
         self.unit_plots = {}
         self.vb = {}
@@ -139,20 +138,31 @@ class MainWindow(QtWidgets.QWidget):
         cut_filename_label = QtWidgets.QLabel("Cut Filename:")
         self.cut_filename = QtWidgets.QLineEdit()
         self.cut_filename.setText(default_filename)
-        self.cut_filename.textChanged.connect(self.cut_filename_changed)
+        # self.cut_filename.textChanged.connect(self.cut_filename_changed)
         self.cut_filename.setToolTip('The name of the cut file containing the sorted values!')
         self.choose_cut_filename_btn = QtWidgets.QPushButton("Choose Cut Filename")
         self.choose_cut_filename_btn.setToolTip('This button will allow you to choose a cut file to use!')
         self.choose_cut_filename_btn.clicked.connect(self.choose_cut_filename)
 
         line_edit_layout = QtWidgets.QVBoxLayout()
-        line_edit_layout.addWidget(self.cut_filename)
         line_edit_layout.addWidget(self.filename)
+        line_edit_layout.addWidget(self.cut_filename)
 
         filename_grid_layout.addWidget(self.choose_cut_filename_btn, *(1, 0))
         filename_grid_layout.addWidget(cut_filename_label, *(1, 1), QtCore.Qt.AlignRight)
 
         filename_grid_layout.addLayout(line_edit_layout, *(0, 2), 2, 1)
+
+        # ------- move invalid -----------
+
+        move_to_channel_label = QtWidgets.QLabel("Move to Channel:")
+        self.move_to_channel = QtWidgets.QLineEdit()
+        self.move_to_channel.setToolTip("This is the channel that you will move selected cells too.")
+        self.move_to_channel.setText(default_move_channel)
+
+        move_to_channel_layout = QtWidgets.QHBoxLayout()
+        move_to_channel_layout.addWidget(move_to_channel_label)
+        move_to_channel_layout.addWidget(self.move_to_channel)
 
         # -------- spike parameter options -------------------------------------
 
@@ -198,28 +208,14 @@ class MainWindow(QtWidgets.QWidget):
         axis_layout.addLayout(y_axis_layout)
         axis_layout.addLayout(z_axis_layout)
 
-        channel_layout = QtWidgets.QHBoxLayout()
-        channel_label = QtWidgets.QLabel("Channel:")
-        self.channel_cb = QtWidgets.QComboBox()
-
-        for channel in range(4):
-            self.channel_cb.addItem(str(channel+1))
-
-        self.channel_cb.currentIndexChanged.connect(self.channel_changed)
-        self.channel_cb.setCurrentIndex(0)
-
-        self.channel = int(self.channel_cb.currentText()) - 1
-
-        channel_layout.addWidget(channel_label)
-        channel_layout.addWidget(self.channel_cb)
-
         tetrode_layout = QtWidgets.QHBoxLayout()
         tetrode_label = QtWidgets.QLabel("Tetrode:")
         self.tetrode_cb = QtWidgets.QComboBox()
+        self.tetrode_cb.currentIndexChanged.connect(self.tetrode_changed)
         tetrode_layout.addWidget(tetrode_label)
         tetrode_layout.addWidget(self.tetrode_cb)
 
-        spike_parameter_widgets = [tetrode_layout, channel_layout, axis_layout]
+        spike_parameter_widgets = [tetrode_layout, axis_layout, move_to_channel_layout]
 
         spike_parameter_layout.addStretch(1)
         for i, widget in enumerate(spike_parameter_widgets):
@@ -261,12 +257,15 @@ class MainWindow(QtWidgets.QWidget):
         self.plot_btn = QtWidgets.QPushButton("Plot")
         self.plot_btn.clicked.connect(lambda: manage_features(self))
 
+        self.reload_cut_btn = QtWidgets.QPushButton("Reload Cut")
+        self.reload_cut_btn.clicked.connect(self.reload_cut)
+
         self.quit_btn = QtWidgets.QPushButton("Quit")
         self.quit_btn.clicked.connect(self.close_app)
         self.quit_btn.setShortcut("Ctrl+Q")  # creates shortcut for the quit button
         self.quit_btn.setToolTip('Click to quit gebaSpike!')
 
-        button_order = [self.plot_btn, self.quit_btn]
+        button_order = [self.plot_btn, self.reload_cut_btn, self.quit_btn]
 
         for btn in button_order:
             button_layout.addWidget(btn)
@@ -293,8 +292,6 @@ class MainWindow(QtWidgets.QWidget):
         self.setLayout(main_window_layout)  # defining the layout of the Main Window
 
         # center(self)  # centering the window
-
-        self.invalid_channel = 0
 
         self.show()  # shows the window
 
@@ -376,6 +373,8 @@ class MainWindow(QtWidgets.QWidget):
         self.active_ROI = []
         self.unit_data = {}
 
+        self.drag_active = False
+
         self.unit_drag_lines = {}
 
         self.samples_per_spike = None
@@ -422,6 +421,14 @@ class MainWindow(QtWidgets.QWidget):
                 while self.choice is None:
                     time.sleep(0.1)
 
+    def reload_cut(self):
+
+        self.unit_win.clear()
+        self.feature_win.clear()
+        self.reset_parameters()
+
+        manage_features(self)
+
     def choose_filename(self):
         """
         This method will allow you to choose a filename to analyze.
@@ -456,6 +463,7 @@ class MainWindow(QtWidgets.QWidget):
         if session_valid:
             # replace the current .set field in the choose .set field with chosen filename
             self.filename.setText(current_filename)
+
             self.reset_parameters()
 
         else:
@@ -465,19 +473,23 @@ class MainWindow(QtWidgets.QWidget):
                 while self.choice is None:
                     time.sleep(0.1)
 
+    def set_cut_filename(self):
+        filename = self.filename.text()
+        tetrode = int(self.tetrode_cb.currentText())
+        cut_filename = '%s_%d.cut' % (os.path.splitext(filename)[0], tetrode)
+        self.cut_filename.setText(cut_filename)
+
+    def tetrode_changed(self):
+
+        # we will update the cut_filename
+        self.set_cut_filename()
+
     def cut_filename_changed(self):
         """
         This method will run when the cut filename LineEdit has been changed
         """
-        filename = self.filename.text()
-        if os.path.exists(filename):
-            self.tetrode_cb.clear()
-
-            tetrode_path, tetrode_list = find_tet(self.filename.text())
-
-            for file in tetrode_list:
-                tetrode = os.path.splitext(file)[-1][1:]
-                self.tetrode_cb.addItem(tetrode)
+        cut_filename = self.cut_filename.text()
+        return
 
     def filename_changed(self):
         """
@@ -490,15 +502,13 @@ class MainWindow(QtWidgets.QWidget):
         if os.path.exists(filename):
             self.tetrode_cb.clear()
 
-            tetrode_path, tetrode_list = find_tet(self.filename.text())
+            tetrode_list = find_tetrodes(self.filename.text())
 
             for file in tetrode_list:
                 tetrode = os.path.splitext(file)[-1][1:]
                 self.tetrode_cb.addItem(tetrode)
 
-    def channel_changed(self):
-
-        self.channel = int(self.channel_cb.currentText()) - 1
+        self.set_cut_filename()
 
 
 def launch_gui():

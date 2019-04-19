@@ -1,4 +1,5 @@
 import numpy as np
+from sklearn.decomposition import PCA
 
 
 def feature_Energy(data):
@@ -27,7 +28,18 @@ def feature_Energy(data):
     return E.T
 
 
-def feature_WavePCX(data, iPC=1, norm=True):
+def feature_WavePCX_scikit(data, iPC=1):
+
+    outputs = np.zeros((data.shape[0], data.shape[1]))
+    for i, channel_data in enumerate(data):
+        pca = PCA(n_components=iPC)
+        principalComponents = pca.fit_transform(channel_data)
+        outputs[i, :] = principalComponents[:, iPC-1]
+
+    return outputs.T
+
+
+def feature_WavePCX(data, iPC=1, norm=False):
     """Creates the principal components for the waveforms
     Args:
         data: ndarray representing spike data (num_channels X num_spikes X samples_per_spike)

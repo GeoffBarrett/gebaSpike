@@ -115,10 +115,14 @@ class PltWidget(pg.PlotWidget):
 class MultiLine(pg.QtGui.QGraphicsPathItem):
     def __init__(self, x, y, *args, **kwargs):
         """x and y are 2D arrays of shape (Nplots, Nsamples)"""
+        self._boundingRect = None
+
         connect = np.ones(x.shape, dtype=bool)
         connect[:, -1] = 0  # don't draw the segment between each trace
         self.path = pg.arrayToQPath(x.flatten(), y.flatten(), connect.flatten())
         pg.QtGui.QGraphicsPathItem.__init__(self, self.path)
+
+        self.check_function_call = 0
 
         pen_kwargs = {}
         for kwarg in kwargs:
@@ -135,4 +139,7 @@ class MultiLine(pg.QtGui.QGraphicsPathItem):
         return pg.QtGui.QGraphicsItem.shape(self)
 
     def boundingRect(self):
-        return self.path.boundingRect()
+        if self._boundingRect is None:
+            self._boundingRect = self.path.boundingRect()
+        return self._boundingRect
+

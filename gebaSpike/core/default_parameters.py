@@ -17,4 +17,8 @@ feature_spike_opacity = 0.5
 # unitMode = 'MatplotWidget'
 unitMode = 'PyQt'
 
+default_move_channel = str(0)
+
 channel_range = 256
+
+max_spike_plots = 1000
