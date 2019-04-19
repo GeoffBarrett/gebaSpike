@@ -229,6 +229,12 @@ def getSlope(points):
     return slope
 
 
+def findSpikeSubsample(data, max_n):
+    if data.shape[0] > max_n:
+        data_i = np.concatenate((np.argmax(data, axis=0), np.argmin(data, axis=0)))
+    return data
+
+
 def getYIntercept(slope, point):
     return point[1] - slope * point[0]
 
@@ -412,7 +418,7 @@ def plot_units(self):
         self.unit_plots[index][0].hideButtons()  # hide the auto-resize button
         self.unit_plots[index][0].setMouseEnabled(x=False, y=False)  # disables the mouse interactions
         self.unit_plots[index][0].enableAutoRange(False, False)
-        self.unit_plots[index][0].setDownsampling(mode='peak')
+        # self.unit_plots[index][0].setDownsampling(mode='peak')
 
         # self.unit_drag_lines[index] = pg.LineSegmentROI([[0, 0], [30, 30]])
         self.unit_drag_lines[index] = pg.PolyLineROI([[0, 0], [30, 30]])
