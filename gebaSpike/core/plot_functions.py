@@ -230,8 +230,33 @@ def getSlope(points):
 
 
 def findSpikeSubsample(data, max_n):
-    if data.shape[0] > max_n:
-        data_i = np.concatenate((np.argmax(data, axis=0), np.argmin(data, axis=0)))
+    if data.shape[1] > max_n:
+        # show the clipped values
+
+        ymin = np.amax(data)
+        ymax = np.amin(data)
+
+        # remove the clipped cells first
+        data_bool = np.zeros_like(data)
+        data_bool[np.where((data >= ymax) | (data <= ymin))] = 1
+        data_boolsum = np.sum(data_bool, axis=2)
+        clipped_cell_i = np.where(data_boolsum >= 5)[1]
+        non_clipped_cell_i = np.setdiff1d(np.arange(data.shape[1] - 1), clipped_cell_i.flatten)
+
+        # find the outlying points
+        data_i = np.unique(np.concatenate((np.argmax(data[:, non_clipped_cell_i, :], axis=1),
+                                           np.argmin(data[:, non_clipped_cell_i, :], axis=1))
+                                          ).flatten())
+
+        remaining_index_choices = np.setdiff1d(np.arange(data.shape[1] - 1), data_i)
+
+        # now just take evenly spaced indices of the remaining choices
+        data_i = np.concatenate((data_i,
+                                 remaining_index_choices[np.linspace(0,
+                                                                     len(remaining_index_choices) - 1,
+                                                                     num=(max_n - len(data_i))
+                                                                     ).astype(int)]))
+        data = data[:, data_i, :]
     return data
 
 
@@ -418,9 +443,7 @@ def plot_units(self):
         self.unit_plots[index][0].hideButtons()  # hide the auto-resize button
         self.unit_plots[index][0].setMouseEnabled(x=False, y=False)  # disables the mouse interactions
         self.unit_plots[index][0].enableAutoRange(False, False)
-        # self.unit_plots[index][0].setDownsampling(mode='peak')
 
-        # self.unit_drag_lines[index] = pg.LineSegmentROI([[0, 0], [30, 30]])
         self.unit_drag_lines[index] = pg.PolyLineROI([[0, 0], [30, 30]])
         self.unit_drag_lines[index].hide()
         self.unit_plots[index][0].addItem(self.unit_drag_lines[index])
@@ -440,16 +463,20 @@ def plot_units(self):
         # appending the cell number to the unit_plots list so we know which cell refers to which plot
         self.unit_plots[index].append(cell)
 
-        channel_max = np.amax(cell_data[0])
-
         self.cell_indices[cell] = cell_bool
+
+        cell_data_sub = findSpikeSubsample(cell_data, max_spike_plots)
 
         for channel in np.arange(self.n_channels):
             # we will keep the data and the indices
 
             # shifting the data so that the next channel resides below the previous
             # also making the 1st channel start at a y value of 0
-            plot_data = cell_data[channel] - channel*channel_range - channel_max
+            plot_data = cell_data[channel]
+            channel_max = np.amax(plot_data)
+            plot_data = plot_data - channel*channel_range - channel_max
+
+            cell_data_sub_channel = cell_data_sub[channel] - channel*channel_range - channel_max
 
             plot_data_avg = np.mean(plot_data, axis=0).reshape((1, -1))
 
@@ -458,16 +485,17 @@ def plot_units(self):
             else:
                 self.unit_data[index][channel] = plot_data
 
-            if plot_data.shape[0] > max_spike_plots:
-                plot_data = plot_data[np.linspace(0, plot_data.shape[0]-1, num=max_spike_plots).astype(int), :]
+            # if plot_data.shape[0] > max_spike_plots:
+            #    # plot_data = plot_data[np.linspace(0, plot_data.shape[0]-1, num=max_spike_plots).astype(int), :]
+            #    plot_data = findSpikeSubsample(plot_data, max_spike_plots)
 
             if index not in self.plot_lines.keys():
 
-                self.plot_lines[index] = {channel: MultiLine(np.tile(np.arange(self.samples_per_spike), (plot_data.shape[0], 1)),
-                                                   plot_data, pen_color=get_channel_color(cell))}
+                self.plot_lines[index] = {channel: MultiLine(np.tile(np.arange(self.samples_per_spike), (cell_data_sub_channel.shape[0], 1)),
+                                                             cell_data_sub_channel, pen_color=get_channel_color(cell))}
             else:
-                self.plot_lines[index][channel] = MultiLine(np.tile(np.arange(self.samples_per_spike), (plot_data.shape[0], 1)),
-                                       plot_data, pen_color=get_channel_color(cell))
+                self.plot_lines[index][channel] = MultiLine(np.tile(np.arange(self.samples_per_spike), (cell_data_sub_channel.shape[0], 1)),
+                                                            cell_data_sub_channel, pen_color=get_channel_color(cell))
 
             if index not in self.avg_plot_lines.keys():
                 self.avg_plot_lines[index] = {channel: MultiLine(np.arange(self.samples_per_spike).reshape((1, -1)),
@@ -519,8 +547,6 @@ def manage_features(self):
                 self.cut_data_original = self.cut_data.copy()  # keep a copy of the original to revert if we want.
 
             load_features(self)
-
-            # plot_features(self)
 
             plot_units(self)
 
