@@ -1,5 +1,5 @@
 from pyqtgraph.widgets.FileDialog import FileDialog
-from  pyqtgraph.Qt import QtGui, QtCore, QtSvg
+from pyqtgraph.Qt import QtGui, QtCore, QtSvg
 from pyqtgraph.python2_3 import asUnicode, basestring
 from pyqtgraph.GraphicsScene import GraphicsScene
 import os, re

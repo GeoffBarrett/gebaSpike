@@ -4,16 +4,17 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
 from core.gui_utils import center, validate_session, Communicate, validate_cut
 from core.default_parameters import project_name, default_filename, defaultXAxis, defaultYAxis, defaultZAxis, openGL, \
-unitMode, default_move_channel
+default_move_channel
 from core.Tint_Matlab import find_tetrodes
-from core.plot_functions import manage_features, feature_name_map
-# from core.plot_utils import CustomViewBox, PltWidget
+from core.plot_functions import manage_features, feature_name_map, moveToChannel, undo_function
+from core.PopUpCutting import PopUpCutWindow
+from core.cut_functions import write_cut
+from core.plot_functions import get_index_from_cell
 import pyqtgraph.opengl as gl
-# from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
-# from mpl_toolkits.mplot3d import Axes3D
 import os
 import json
 import time
+import numpy as np
 
 
 class MainWindow(QtWidgets.QWidget):
@@ -38,7 +39,13 @@ class MainWindow(QtWidgets.QWidget):
         self.plot_btn = None
         self.feature_plot = None
 
+        self.latest_actions = {}
+
+        self.actions_made = False
+
         self.drag_active = False
+
+        self.last_drag_index = None
 
         self.feature_data = None
         self.tetrode_data = None
@@ -50,6 +57,8 @@ class MainWindow(QtWidgets.QWidget):
         self.feature_plot_added = False
         self.samples_per_spike = None
 
+        self.unit_positions = {}
+        self.cell_subsample_i = {}
         self.unit_drag_lines = {}
         self.active_ROI = []
         self.unit_data = {}
@@ -65,6 +74,8 @@ class MainWindow(QtWidgets.QWidget):
         self.cell_indices = {}
 
         self.spike_colors = None
+
+        self.original_cell_count = {}
 
         self.unit_plots = {}
         self.vb = {}
@@ -85,8 +96,6 @@ class MainWindow(QtWidgets.QWidget):
         self.PROJECT_DIR = project_dir  # project directory
         self.SETTINGS_DIR = os.path.join(self.PROJECT_DIR, 'settings')  # settings directory
 
-        # self.unit_plotwidget = {}
-
         self.settings_filename = os.path.join(self.SETTINGS_DIR, 'settings.json')
         self.settings = self.get_settings()
 
@@ -105,6 +114,8 @@ class MainWindow(QtWidgets.QWidget):
         # pg.setConfigOption('background', 'w')
         # pg.setConfigOption('foreground', 'k')
         pg.setConfigOptions(antialias=True)
+
+        self.PopUpCutWindow = PopUpCutWindow(self)
 
         QtWidgets.QApplication.setStyle(QtWidgets.QStyleFactory.create('GTK+'))
 
@@ -159,6 +170,7 @@ class MainWindow(QtWidgets.QWidget):
         self.move_to_channel = QtWidgets.QLineEdit()
         self.move_to_channel.setToolTip("This is the channel that you will move selected cells too.")
         self.move_to_channel.setText(default_move_channel)
+        self.move_to_channel.textChanged.connect(lambda: moveToChannel(self, 'main'))
 
         move_to_channel_layout = QtWidgets.QHBoxLayout()
         move_to_channel_layout.addWidget(move_to_channel_label)
@@ -239,12 +251,7 @@ class MainWindow(QtWidgets.QWidget):
             self.feature_win = MatplotlibWidget()
             self.feature_win.toolbar.hide()  # hide the toolbar
 
-        if unitMode == 'MatplotWidget':
-            self.unit_win = MatplotlibWidget()
-            self.unit_win.toolbar.hide()  # hide the toolbar
-
-        else:
-            self.unit_win = pg.GraphicsWindow()
+        self.unit_win = pg.GraphicsWindow()
 
         plot_layout = QtWidgets.QHBoxLayout()
         for _object in [self.feature_win, self.unit_win]:
@@ -260,12 +267,20 @@ class MainWindow(QtWidgets.QWidget):
         self.reload_cut_btn = QtWidgets.QPushButton("Reload Cut")
         self.reload_cut_btn.clicked.connect(self.reload_cut)
 
+        self.save_btn = QtWidgets.QPushButton("Save Cut")
+        self.save_btn.clicked.connect(self.save_function)
+        self.save_btn.setToolTip('Save to the current cut file')
+
+        self.undo_btn = QtWidgets.QPushButton("Undo")
+        self.undo_btn.clicked.connect(lambda: undo_function(self))
+        self.undo_btn.setToolTip('Click to undo previous action!')
+
         self.quit_btn = QtWidgets.QPushButton("Quit")
         self.quit_btn.clicked.connect(self.close_app)
         self.quit_btn.setShortcut("Ctrl+Q")  # creates shortcut for the quit button
         self.quit_btn.setToolTip('Click to quit gebaSpike!')
 
-        button_order = [self.plot_btn, self.reload_cut_btn, self.quit_btn]
+        button_order = [self.plot_btn, self.save_btn, self.undo_btn, self.reload_cut_btn, self.quit_btn]
 
         for btn in button_order:
             button_layout.addWidget(btn)
@@ -287,13 +302,38 @@ class MainWindow(QtWidgets.QWidget):
                 if addStretch:
                     main_window_layout.addStretch(1)
 
-        # main_window_layout.addStretch(1)  # adds stretch to put the version info at the bottom
-
         self.setLayout(main_window_layout)  # defining the layout of the Main Window
 
-        # center(self)  # centering the window
-
         self.show()  # shows the window
+
+    def save_function(self):
+
+        if self.cut_filename.text() == default_filename:
+            return
+
+        save_filename = os.path.realpath(self.cut_filename.text())
+
+        if os.path.exists(save_filename):
+            self.choice = None
+            self.LogError.signal.emit('OverwriteCut!%s' % save_filename)
+            while self.choice is None:
+                time.sleep(0.1)
+
+            if self.choice != QtWidgets.QMessageBox.Yes:
+                return
+
+        if len(self.tetrode_data) == 0:
+            return
+
+        # organize the cut data
+        n_spikes = self.tetrode_data.shape[1]
+        cut_values = np.zeros((n_spikes))
+
+        for cell, cell_indices in self.cell_indices.items():
+            cut_values[cell_indices] = cell
+
+        # save the cut filename
+        write_cut(save_filename, cut_values)
 
     def close_app(self):
         """This method will prompt the user, asking if they would like to quit or not"""
@@ -346,6 +386,33 @@ class MainWindow(QtWidgets.QWidget):
                                                          " session filename before proceeding!",
                                                          QtWidgets.QMessageBox.Ok)
 
+        elif 'InvalidMoveChannel' in error:
+            self.choice = QtWidgets.QMessageBox.question(self, "Invalid Move to Channel Value!",
+                                                         "The value you have chosen for the 'Move to Channel' value is "
+                                                         "invalid, please choose a valid value before continuing!",
+                                                         QtWidgets.QMessageBox.Ok)
+
+        elif 'SameChannelInvalid' in error:
+            self.choice = QtWidgets.QMessageBox.question(self, "Same Channel Error!",
+                                                         "The value you have chosen for the 'Move to Channel' value is "
+                                                         "the same as the cell you are cutting from! If you would like "
+                                                         "to move these selected spikes to a different channel, please "
+                                                         "choose another channel!",
+                                                         QtWidgets.QMessageBox.Ok)
+
+        elif 'ActionsMade' in error:
+            self.choice = QtWidgets.QMessageBox.question(self, "Are you sure............?",
+                                                         "You have performed some actions that will be lost when you"
+                                                         " reload this cut file. Are you sure you want to continue?",
+                                                         QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.Yes)
+
+        elif 'OverwriteCut' in error:
+            cut_file = os.path.realpath(error.split('!')[1])
+            self.choice = QtWidgets.QMessageBox.question(self, "Cut Filename Exists",
+                                                         "The following cut filename exists:\n\n%s\n\n Are you sure you " 
+                                                         "want to overwrite this file?" % cut_file,
+                                                         QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+
     def get_settings(self):
         settings = {}
         if os.path.exists(self.settings_filename):
@@ -372,6 +439,15 @@ class MainWindow(QtWidgets.QWidget):
         self.vb = {}
         self.active_ROI = []
         self.unit_data = {}
+        self.cell_subsample_i = {}
+        self.unit_positions = {}
+        self.original_cell_count = {}
+
+        self.latest_actions = {}
+
+        self.actions_made = False
+
+        self.last_drag_index = None
 
         self.drag_active = False
 
@@ -383,6 +459,13 @@ class MainWindow(QtWidgets.QWidget):
         self.unit_plots = {}
         self.unit_rows = 0
         self.unit_cols = 0
+
+        self.reset_plots()
+
+    def reset_plots(self):
+
+        self.feature_win.clear()
+        self.unit_win.clear()
 
     def choose_cut_filename(self):
         if 'file_directory' not in self.settings.keys():
@@ -423,11 +506,17 @@ class MainWindow(QtWidgets.QWidget):
 
     def reload_cut(self):
 
-        self.unit_win.clear()
-        self.feature_win.clear()
-        self.reset_parameters()
+        if self.actions_made is True:
+            self.choice = None
+            self.LogError.signal.emit('ActionsMade')
+            while self.choice is None:
+                time.sleep(0.1)
 
-        manage_features(self)
+        if self.choice == QtWidgets.QMessageBox.Yes:
+            self.reset_plots()
+            self.reset_parameters()
+
+            manage_features(self)
 
     def choose_filename(self):
         """

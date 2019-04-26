@@ -48,7 +48,7 @@ class CustomViewBox(pg.ViewBox):
         if not self.menuEnabled():
             return
         menu = self.getMenu()
-        pos  = ev.screenPos()
+        pos = ev.screenPos()
         menu.popup(QtCore.QPoint(pos.x(), pos.y()))
 
     def getMenu(self):
@@ -64,8 +64,8 @@ class CustomViewBox(pg.ViewBox):
 
     def export(self):
         # choose filename to save as
-        save_filename = QtWidgets.QFileDialog.getSaveFileName(QtGui.QWidget(), 'Save Scores', '',
-                                                          'PNG (*.png);;JPG (*.jpg);;TIF (*.tif);;GIF (*.gif)')
+        save_filename, save_ext = QtWidgets.QFileDialog.getSaveFileName(QtGui.QWidget(), 'Save Scores', '',
+                                                                        'PNG (*.png);;JPG (*.jpg);;TIF (*.tif);;GIF (*.gif)')
 
         if save_filename == '':
             return
@@ -75,9 +75,9 @@ class CustomViewBox(pg.ViewBox):
 
         if 'GraphicsWindow' in str(self.item):
             # get the main plot which occurs at row=1, and column=0
-            plotitem = self.item.getItem(1, 0)
+            plotitem = self.item.getItem(0, 0)
             # turn off the infinite line marking where the cursor is
-            self.window.mouse_vLine.hide()
+            # self.window.mouse_vLine.hide()
 
             exporter = ImageExporter(plotitem)
 
@@ -87,7 +87,7 @@ class CustomViewBox(pg.ViewBox):
             # save to file
             exporter.export(save_filename)
 
-            self.window.mouse_vLine.show()
+            # self.window.mouse_vLine.show()
 
         elif 'PltWidget' in str(self.item):
             plotitem = self.item.getPlotItem()
@@ -120,6 +120,7 @@ class MultiLine(pg.QtGui.QGraphicsPathItem):
         connect = np.ones(x.shape, dtype=bool)
         connect[:, -1] = 0  # don't draw the segment between each trace
         self.path = pg.arrayToQPath(x.flatten(), y.flatten(), connect.flatten())
+
         pg.QtGui.QGraphicsPathItem.__init__(self, self.path)
 
         self.check_function_call = 0
