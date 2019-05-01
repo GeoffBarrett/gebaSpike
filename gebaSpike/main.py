@@ -333,7 +333,15 @@ class MainWindow(QtWidgets.QWidget):
             cut_values[cell_indices] = cell
 
         # save the cut filename
-        write_cut(save_filename, cut_values)
+
+        if len(cut_values) != len(self.cut_data_original):
+            self.choice = None
+            self.LogError.signal.emit('cutSizeError')
+            while self.choice is None:
+                time.sleep(0.1)
+            return
+        else:
+            write_cut(self, save_filename, cut_values)
 
     def close_app(self):
         """This method will prompt the user, asking if they would like to quit or not"""
@@ -368,6 +376,11 @@ class MainWindow(QtWidgets.QWidget):
                                                          "The following session filename is invalid: \n%s\nPlease" %
                                                          session +
                                                          " ensure that the appropriate files exist for this session.",
+                                                         QtWidgets.QMessageBox.Ok)
+
+        elif 'cutSizeError' in error:
+            self.choice = QtWidgets.QMessageBox.question(self, "Cut Size Error!",
+                                                         "Trying to save an inappropriate number of spikes, cannot save cut file!",
                                                          QtWidgets.QMessageBox.Ok)
 
         elif 'InvalidCut' in error:
@@ -432,7 +445,7 @@ class MainWindow(QtWidgets.QWidget):
         self.cut_data_original = None
         self.n_channels = None
         self.spike_times = None
-        self.scatterItem = None
+
         self.cell_indices = {}
         self.plot_lines = {}
         self.avg_plot_lines = {}
@@ -464,7 +477,10 @@ class MainWindow(QtWidgets.QWidget):
 
     def reset_plots(self):
 
-        self.feature_win.clear()
+        if hasattr(self, 'scatterItem'):
+            if self.scatterItem is not None:
+                self.glViewWidget.removeItem(self.scatterItem)
+                self.scatterItem = None
         self.unit_win.clear()
 
     def choose_cut_filename(self):
@@ -583,7 +599,6 @@ class MainWindow(QtWidgets.QWidget):
         This method will run when the cut filename LineEdit has been changed
         """
         cut_filename = self.cut_filename.text()
-        return
 
     def filename_changed(self):
         """

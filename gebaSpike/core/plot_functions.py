@@ -1083,6 +1083,8 @@ def manage_features(self):
 
             load_features(self)
 
+            plot_features(self)
+
             plot_units(self)
 
         else:
