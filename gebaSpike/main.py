@@ -551,7 +551,7 @@ class MainWindow(QtWidgets.QWidget):
 
         if session_valid:
             # replace the current .set field in the choose .set field with chosen filename
-            self.filename.setText(current_filename)
+            self.filename.setText(os.path.realpath(current_filename))
 
             self.reset_parameters()
 
@@ -564,7 +564,12 @@ class MainWindow(QtWidgets.QWidget):
 
     def set_cut_filename(self):
         filename = self.filename.text()
-        tetrode = int(self.tetrode_cb.currentText())
+
+        try:
+            tetrode = int(self.tetrode_cb.currentText())
+        except ValueError:
+            return
+
         cut_filename = '%s_%d.cut' % (os.path.splitext(filename)[0], tetrode)
         self.cut_filename.setText(cut_filename)
 

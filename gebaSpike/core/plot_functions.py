@@ -4,7 +4,7 @@ import numpy as np
 from core.default_parameters import openGL, gridLines, feature_spike_opacity, feature_spike_size, channel_range, \
     max_spike_plots, max_num_actions
 from core.gui_utils import validate_session
-from core.Tint_Matlab import find_unit, getspikes
+from core.Tint_Matlab import find_unit, getspikes, read_cut
 from core.feature_functions import CreateFeatures
 from core.plot_utils import CustomViewBox, get_channel_color, MultiLine
 import pyqtgraph.opengl as gl
@@ -173,7 +173,7 @@ def get_spike_colors(self):
         self.spike_colors[cell_bool, :-1] = np.asarray(cell_color)/255
 
 
-def get_grid_dimensions(n_cells, method='auto'):
+def get_grid_dimensions(n_cells, method='auto', n=None):
     """
     This function will automate the rows and columns for grid of unit plots. Right now it will
     attempt to just make the grid as square as possible. However, Tint does 5 per row, so I might
@@ -210,6 +210,15 @@ def get_grid_dimensions(n_cells, method='auto'):
 
         cols = 5
         rows = int(np.ceil(n_cells/cols))
+        return rows, cols
+
+    elif method == 'nper':
+        if n is None:
+            raise ValueError('Invalid n value!')
+
+        else:
+            cols = n
+            rows = int(np.ceil(n_cells / cols))
 
         return rows, cols
 
@@ -233,7 +242,11 @@ def drag(self, index, ev=None):
         # the user is using the left
         if not self.drag_active or index != self.last_drag_index:
             for roi in self.active_ROI:
-                roi.hide()
+                try:
+                    roi.hide()
+                except RuntimeError:
+                    # likely the subplot was removed
+                    pass
 
             self.unit_drag_lines[index].show()  # showing the LineSegmentROI
             self.active_ROI = [self.unit_drag_lines[index]]
@@ -380,6 +393,7 @@ def mouse_click_event(self, index, ev=None):
             # append the crossed lines to the invalid cell's plot
             invalid_index = get_index_from_cell(self, invalid_cell_number)
 
+            reconfigure = False
             # remove these spikes from all the channels
             for data_chan in np.arange(self.n_channels):
                 if invalid_index is not None:
@@ -389,21 +403,56 @@ def mouse_click_event(self, index, ev=None):
                     self.unit_data[invalid_index][data_chan] = np.vstack((self.unit_data[invalid_index][data_chan],
                                                                           invalid_cell_data))
 
+                    # update the plotted subsample as well
+                    _, subsample_i = findSpikeSubsample(self.unit_data[invalid_index][data_chan], max_spike_plots)
+                    if invalid_cell_number not in self.cell_subsample_i.keys():
+                        self.cell_subsample_i[invalid_cell_number] = {data_chan: subsample_i}
+                    else:
+                        self.cell_subsample_i[invalid_cell_number][data_chan] = subsample_i
+                else:
+                    reconfigure = True
+
                 # delete the invalid data from the selected channel
                 self.unit_data[index][data_chan] = np.delete(self.unit_data[index][data_chan], crossed_cells, axis=0)
 
-            # update the bool
+                # recalculate subplot for the channel that the spikes were removed from
+                if len(self.unit_data[index][data_chan]) > 0:
+                    _, subsample_i = findSpikeSubsample(self.unit_data[index][data_chan], max_spike_plots)
+                    if cell not in self.cell_subsample_i.keys():
+                        self.cell_subsample_i[cell] = {data_chan: subsample_i}
+                    else:
+                        self.cell_subsample_i[cell][data_chan] = subsample_i
+                else:
+                    # there is no data left, don't need to worry about the subsampling anymore
+                    if cell in self.cell_subsample_i.keys():
+                        self.cell_subsample_i.pop(cell)
+                        reconfigure = True
 
+            # check if the cell still exists
+            for key, value in self.unit_data[index].items():
+                if len(value) == 0:
+                    self.unit_data.pop(index)
+                    reconfigure = True
+                    break
+
+            # update the bool
             cell_indices = self.cell_indices[cell]
             # append invalid cells to the new cell number
             invalid_cells = cell_indices[crossed_cells]
             self.cell_indices[cell] = np.delete(cell_indices, crossed_cells)
 
-            # determine if we need to reconfigure the main window
-            reconfigure = False
+            # check if there are still indices for this cell, if empty we will remove
+            if len(self.cell_indices[cell]) == 0:
+                clear_unit(self, cell)  # delete the cell's plots
+                if cell in self.original_cell_count.keys():
+                    self.original_cell_count.pop(cell)
+                reconfigure = True
+                self.cell_indices.pop(cell)
+
             if invalid_cell_number in self.cell_indices.keys():
                 # the cell has existed already within the main window, we can just add to this plot
-                self.cell_indices[invalid_cell_number] = np.concatenate((self.cell_indices[cell], invalid_cells))
+                self.cell_indices[invalid_cell_number] = np.concatenate((self.cell_indices[invalid_cell_number],
+                                                                         invalid_cells))
             else:
                 # this cell is not already plotted, have to add the plot and possibly reconfigure
                 self.cell_indices[invalid_cell_number] = invalid_cells
@@ -426,15 +475,21 @@ def mouse_click_event(self, index, ev=None):
                 replot_unit(self, invalid_index)
             else:
                 # we will need to reconfigure the main window possibly, do so
-                replot_unit(self, index)
+
+                if cell in self.cell_indices.keys():
+                    replot_unit(self, index)
+
                 unique_cells = np.asarray(list(self.cell_indices.keys()))
                 reconfigure_units(self, list(unique_cells[unique_cells != 0]))
 
-            self.unit_drag_lines[index].hide()
+            if index in self.unit_drag_lines:
+                self.unit_drag_lines[index].hide()
 
             try:
                 self.active_ROI.remove(self.unit_drag_lines[index])
             except ValueError:
+                pass
+            except KeyError:
                 pass
 
             self.drag_active = False
@@ -534,13 +589,6 @@ def replot_unit(self, index, cell=None):
 
         plot_data = self.unit_data[index][channel]
         current_n = plot_data.shape[0]
-        if current_n > max_spike_plots:
-            plot_data, subsample_i = findSpikeSubsample(plot_data, max_spike_plots)
-
-            if cell not in self.cell_subsample_i.keys():
-                self.cell_subsample_i[cell] = {channel: subsample_i}
-            else:
-                self.cell_subsample_i[cell][channel] = subsample_i
 
         self.plot_lines[index][channel] = MultiLine(
             np.tile(np.arange(self.samples_per_spike), (plot_data.shape[0], 1)),
@@ -566,6 +614,22 @@ def replot_unit(self, index, cell=None):
             self.PopUpCutWindow.plot(index, cell)
 
 
+def clear_unit(self, cell):
+    """
+    This function will clear the plots for a cell that has been removed.
+
+    :param self:
+    :param cell:
+    :return:
+    """
+
+    index = get_index_from_cell(self, cell)
+
+    for chan in np.arange(self.n_channels):
+        self.unit_plots[index][0].removeItem(self.plot_lines[index][chan])
+        self.unit_plots[index][0].removeItem(self.avg_plot_lines[index][chan])
+
+
 def reconfigure_units(self, unique_cells):
     """
     This function is called when the cell that you want to plot has not been created yet. Thus we might need to
@@ -582,7 +646,7 @@ def reconfigure_units(self, unique_cells):
     n_cells = len(unique_cells)
 
     # the number of rows and columns that we want to have plotted
-    rows, cols = get_grid_dimensions(n_cells, method='auto')
+    rows, cols = get_grid_dimensions(n_cells, method='nper', n=3)
 
     # initialize the current row and column count
     row = 0
@@ -633,164 +697,195 @@ def reconfigure_units(self, unique_cells):
         old_vb[index] = value
     self.vb = {}
 
-    # old_indices = list(old_plots.keys())
-    for index in np.arange(n_cells):
-        cell = unique_cells[index]
+    for index in np.arange(rows*cols):
 
-        # first we need to determine if we need to add a plot or not
-        if (row, col) not in self.old_positions.keys():
-            '''
-            The plot does not exist in this position before, so we will need to add a subplot in this position
-            configure the plot appropriately. As well as add another polyline ROI, and define the drag and mouse
-            clicks
-            '''
+        if index < len(unique_cells):
+            # then we should re-plot these subplot indices
 
-            # add the plot
-            self.unit_positions[(row, col)] = index
-            self.unit_plots[index] = [self.unit_win.addPlot(row=row, col=col,
-                                                            viewBox=CustomViewBox(self, self.unit_win)), cell]
-            # add the plot
-            self.vb[index] = self.unit_plots[index][0].vb
+            cell = unique_cells[index]
 
-            # configure the plot
-            self.unit_plots[index][0].setXRange(0, self.samples_per_spike, padding=0)  # set the x-range
-            self.unit_plots[index][0].setYRange(0, -self.n_channels * channel_range, padding=0)
-            self.unit_plots[index][0].hideAxis('left')  # remove the y-axis
-            self.unit_plots[index][0].hideAxis('bottom')  # remove the x axis
-            self.unit_plots[index][0].hideButtons()  # hide the auto-resize button
-            self.unit_plots[index][0].setMouseEnabled(x=False, y=False)  # disables the mouse interactions
-            self.unit_plots[index][0].enableAutoRange(False, False)
+            # first we need to determine if we need to add a plot or not
+            if (row, col) not in self.old_positions.keys():
+                '''
+                The plot does not exist in this position before, so we will need to add a subplot in this position
+                configure the plot appropriately. As well as add another polyline ROI, and define the drag and mouse
+                clicks
+                '''
 
-            # add the ROI
-            self.unit_drag_lines[index] = pg.PolyLineROI([[0, 0], [30, 30]])
-            self.unit_drag_lines[index].hide()
-            self.unit_plots[index][0].addItem(self.unit_drag_lines[index])
+                # add the plot
+                self.unit_positions[(row, col)] = index
+                self.unit_plots[index] = [self.unit_win.addPlot(row=row, col=col,
+                                                                viewBox=CustomViewBox(self, self.unit_win)), cell]
+                # add the plot
+                self.vb[index] = self.unit_plots[index][0].vb
 
-            # add the drag and mouse click events to the viewbox
-            self.vb[index].mouseDragEvent = partial(drag, self, index)  # overriding the drag event
-            self.vb[index].mouseClickEvent = partial(mouse_click_event, self, index)
+                # configure the plot
+                self.unit_plots[index][0].setXRange(0, self.samples_per_spike, padding=0)  # set the x-range
+                self.unit_plots[index][0].setYRange(0, -self.n_channels * channel_range, padding=0)
+                self.unit_plots[index][0].hideAxis('left')  # remove the y-axis
+                self.unit_plots[index][0].hideAxis('bottom')  # remove the x axis
+                self.unit_plots[index][0].hideButtons()  # hide the auto-resize button
+                self.unit_plots[index][0].setMouseEnabled(x=False, y=False)  # disables the mouse interactions
+                self.unit_plots[index][0].enableAutoRange(False, False)
 
-        else:
-            '''
-            The row/column does exist. we won't need to create a new subplot, but we will need to move
-            everything over and delete the old contents.
-            '''
-            # we will need to find the old index value so we can make sure we can access that plot
-            old_plot_index = get_old_index_from_position(self, (row, col))  # get the index
+                # add the ROI
+                self.unit_drag_lines[index] = pg.PolyLineROI([[0, 0], [30, 30]])
+                self.unit_drag_lines[index].hide()
+                self.unit_plots[index][0].addItem(self.unit_drag_lines[index])
 
-            # defining the new plot use
-            self.unit_plots[index] = [old_unit_plots[old_plot_index][0], cell]
-            self.unit_positions[(row, col)] = index
+                # add the drag and mouse click events to the viewbox
+                self.vb[index].mouseDragEvent = partial(drag, self, index)  # overriding the drag event
+                self.vb[index].mouseClickEvent = partial(mouse_click_event, self, index)
 
-            self.vb[index] = self.unit_plots[index][0].vb
-            self.vb[index].mouseDragEvent = partial(drag, self, index)  # overriding the drag event
-            self.vb[index].mouseClickEvent = partial(mouse_click_event, self, index)
-
-            self.unit_drag_lines[index] = old_unit_drag_lines[old_plot_index]
-
-        if cell in old_plotted_units:
-            # figure out if we have plotted this cell before, if so, we can move that data instead of re-plotting
-
-            # if index < len(old_indices):
-            # if the index is less than the length of the old indices, then
-
-            # old_index = old_indices[index]
-            old_index = get_index_from_old_cell(cell, old_unit_plots)
-
-            current_n = len(self.cell_indices[cell])
-            if cell in self.original_cell_count.keys():
-                setPlotTitle(self.unit_plots[index][0], cell,
-                             original_cell_count=self.original_cell_count[cell],
-                             current_cell_count=current_n)
             else:
-                setPlotTitle(self.unit_plots[index][0], cell, current_cell_count=current_n)
+                '''
+                The row/column does exist. we won't need to create a new subplot, but we will need to move
+                everything over and delete the old contents.
+                '''
+                # we will need to find the old index value so we can make sure we can access that plot
+                old_plot_index = get_old_index_from_position(self, (row, col))  # get the index
 
-            # we are defining the new spike plots and avg plots given the old index
-            self.plot_lines[index] = old_plots[old_index]
-            self.avg_plot_lines[index] = old_avgs[old_index]
-
-            # moving the line plots
-            for channel in self.plot_lines[index].keys():
-                old_unit_plots[old_index][0].removeItem(old_plots[old_index][channel])
-                self.unit_plots[index][0].addItem(self.plot_lines[index][channel])
-
-            # moving the avg plots
-            for channel in self.avg_plot_lines[index].keys():
-                old_unit_plots[old_index][0].removeItem(old_avgs[old_index][channel])
-                self.unit_plots[index][0].addItem(self.avg_plot_lines[index][channel])
-
-            # moving the unit data
-            self.unit_data[index] = old_unit_data[old_index]
-
-        else:
-            # This cell has not been plotted before, so we will need to create the MultiLines
-
-            setTitle = False
-            for channel in np.arange(self.n_channels):
-
+                # defining the new plot use
+                self.unit_plots[index] = [old_unit_plots[old_plot_index][0], cell]
                 self.unit_positions[(row, col)] = index
 
-                # shifting the data so that the next channel resides below the previous
-                # also making the 1st channel start at a y value of 0
+                self.vb[index] = self.unit_plots[index][0].vb
+                self.vb[index].mouseDragEvent = partial(drag, self, index)  # overriding the drag event
+                self.vb[index].mouseClickEvent = partial(mouse_click_event, self, index)
 
-                cell_bool = self.cell_indices[cell]
-                cell_data = self.tetrode_data[:, cell_bool, :]
+                self.unit_drag_lines[index] = old_unit_drag_lines[old_plot_index]
 
-                plot_data = cell_data[channel]
-                channel_max = np.amax(plot_data)
-                plot_data = plot_data - channel * channel_range - channel_max
+            if cell in old_plotted_units:
+                # figure out if we have plotted this cell before, if so, we can move that data instead of re-plotting
 
-                current_n = plot_data.shape[0]
-                if not setTitle:
-                    if cell in self.original_cell_count.keys():
-                        setPlotTitle(self.unit_plots[index][0], cell,
-                                     original_cell_count=self.original_cell_count[cell],
-                                     current_cell_count=current_n)
+                # if index < len(old_indices):
+                # if the index is less than the length of the old indices, then
+
+                # old_index = old_indices[index]
+                old_index = get_index_from_old_cell(cell, old_unit_plots)
+
+                current_n = len(self.cell_indices[cell])
+                if cell in self.original_cell_count.keys():
+                    setPlotTitle(self.unit_plots[index][0], cell,
+                                 original_cell_count=self.original_cell_count[cell],
+                                 current_cell_count=current_n)
+                else:
+                    setPlotTitle(self.unit_plots[index][0], cell, current_cell_count=current_n)
+
+                # we are defining the new spike plots and avg plots given the old index
+                self.plot_lines[index] = old_plots[old_index]
+                self.avg_plot_lines[index] = old_avgs[old_index]
+
+                # moving the line plots
+                for channel in self.plot_lines[index].keys():
+                    old_unit_plots[old_index][0].removeItem(old_plots[old_index][channel])
+                    self.unit_plots[index][0].addItem(self.plot_lines[index][channel])
+
+                # moving the avg plots
+                for channel in self.avg_plot_lines[index].keys():
+                    old_unit_plots[old_index][0].removeItem(old_avgs[old_index][channel])
+                    self.unit_plots[index][0].addItem(self.avg_plot_lines[index][channel])
+
+                # moving the unit data
+                self.unit_data[index] = old_unit_data[old_index]
+
+            else:
+                # This cell has not been plotted before, so we will need to create the MultiLines
+
+                setTitle = False
+                for channel in np.arange(self.n_channels):
+
+                    self.unit_positions[(row, col)] = index
+
+                    # shifting the data so that the next channel resides below the previous
+                    # also making the 1st channel start at a y value of 0
+
+                    cell_bool = self.cell_indices[cell]
+                    cell_data = self.tetrode_data[:, cell_bool, :]
+
+                    plot_data = cell_data[channel]
+                    channel_max = np.amax(plot_data)
+                    plot_data = plot_data - channel * channel_range - channel_max
+
+                    current_n = plot_data.shape[0]
+                    if not setTitle:
+                        if cell in self.original_cell_count.keys():
+                            setPlotTitle(self.unit_plots[index][0], cell,
+                                         original_cell_count=self.original_cell_count[cell],
+                                         current_cell_count=current_n)
+                        else:
+                            setPlotTitle(self.unit_plots[index][0], cell, current_cell_count=current_n)
+                        setTitle = True
+
+                    cell_data_sub_channel, subsample_i = findSpikeSubsample(plot_data, max_spike_plots)
+
+                    if cell not in self.cell_subsample_i.keys():
+                        self.cell_subsample_i[cell] = {channel: subsample_i}
                     else:
-                        setPlotTitle(self.unit_plots[index][0], cell, current_cell_count=current_n)
-                    setTitle = True
+                        self.cell_subsample_i[cell][channel] = subsample_i
 
-                cell_data_sub_channel, subsample_i = findSpikeSubsample(plot_data, max_spike_plots)
+                    plot_data_avg = np.mean(plot_data, axis=0).reshape((1, -1))
 
-                if cell not in self.cell_subsample_i.keys():
-                    self.cell_subsample_i[cell] = {channel: subsample_i}
-                else:
-                    self.cell_subsample_i[cell][channel] = subsample_i
+                    if index not in self.unit_data.keys():
+                        self.unit_data[index] = {channel: plot_data}
+                    else:
+                        self.unit_data[index][channel] = plot_data
 
-                plot_data_avg = np.mean(plot_data, axis=0).reshape((1, -1))
+                    if index not in self.plot_lines.keys():
 
-                if index not in self.unit_data.keys():
-                    self.unit_data[index] = {channel: plot_data}
-                else:
-                    self.unit_data[index][channel] = plot_data
-
-                if index not in self.plot_lines.keys():
-
-                    self.plot_lines[index] = {
-                        channel: MultiLine(
+                        self.plot_lines[index] = {
+                            channel: MultiLine(
+                                np.tile(np.arange(self.samples_per_spike), (cell_data_sub_channel.shape[0], 1)),
+                                cell_data_sub_channel, pen_color=get_channel_color(cell))}
+                    else:
+                        self.plot_lines[index][channel] = MultiLine(
                             np.tile(np.arange(self.samples_per_spike), (cell_data_sub_channel.shape[0], 1)),
-                            cell_data_sub_channel, pen_color=get_channel_color(cell))}
-                else:
-                    self.plot_lines[index][channel] = MultiLine(
-                        np.tile(np.arange(self.samples_per_spike), (cell_data_sub_channel.shape[0], 1)),
-                        cell_data_sub_channel, pen_color=get_channel_color(cell))
+                            cell_data_sub_channel, pen_color=get_channel_color(cell))
 
-                if index not in self.avg_plot_lines.keys():
-                    self.avg_plot_lines[index] = {
-                        channel: MultiLine(np.arange(self.samples_per_spike).reshape((1, -1)),
-                                           plot_data_avg, pen_color='w', pen_width=2)}
-                else:
-                    self.avg_plot_lines[index][channel] = MultiLine(
-                        np.arange(self.samples_per_spike).reshape((1, -1)),
-                        plot_data_avg, pen_color='w', pen_width=2)
+                    if index not in self.avg_plot_lines.keys():
+                        self.avg_plot_lines[index] = {
+                            channel: MultiLine(np.arange(self.samples_per_spike).reshape((1, -1)),
+                                               plot_data_avg, pen_color='w', pen_width=2)}
+                    else:
+                        self.avg_plot_lines[index][channel] = MultiLine(
+                            np.arange(self.samples_per_spike).reshape((1, -1)),
+                            plot_data_avg, pen_color='w', pen_width=2)
 
-                self.unit_plots[index][0].addItem(self.plot_lines[index][channel])
-                self.unit_plots[index][0].addItem(self.avg_plot_lines[index][channel])
+                    self.unit_plots[index][0].addItem(self.plot_lines[index][channel])
+                    self.unit_plots[index][0].addItem(self.avg_plot_lines[index][channel])
+        else:
+            # i made this to remove the items from the plots that we don't need anymore, however I end up just
+            # removing the subplot itself so this is no longer necessary
+            '''
+            # then we should check if the plot has any data on it, and remove it since we no longer need it
+            if (row, col) in self.old_positions.keys():
+                # then we had previously plotted stuff here
+                old_plot_index = get_old_index_from_position(self, (row, col))  # get the index
+
+                for channel in old_plots[old_plot_index].keys():
+                    old_unit_plots[old_plot_index][0].removeItem(old_plots[old_plot_index][channel])
+
+                # removing the avg plots
+                for channel in old_avgs[old_plot_index].keys():
+                    old_unit_plots[old_plot_index][0].removeItem(old_avgs[old_plot_index][channel])
+
+            else:
+                # there is nothing plotted, so don't worry about it
+                pass
+            '''
+            pass
 
         col += 1
         if col >= cols:
             col = 0
             row += 1
+
+    # removing any sub_plots that are no longer necessary
+    for position in self.old_positions.keys():
+        if position not in self.unit_positions.keys():
+            old_plot_index = get_old_index_from_position(self, position)  # get the i
+            plot_item = old_unit_plots[old_plot_index][0]
+            self.unit_win.removeItem(plot_item)
 
     self.old_positons = {}
     self.unit_rows = rows
@@ -798,12 +893,20 @@ def reconfigure_units(self, unique_cells):
 
 
 def setPlotTitle(plot, cell, original_cell_count=None, current_cell_count=None):
+    """
+    This function will set the title for each of the plots so we know which cell is being plotted.
 
+    :param plot:
+    :param cell:
+    :param original_cell_count:
+    :param current_cell_count:
+    :return:
+    """
     title_text = "Cell %d, " % cell
     if current_cell_count is not None:
         title_text += "%d spikes" % current_cell_count
     if original_cell_count is not None:
-        percent_change = np.abs(100 * (original_cell_count - current_cell_count) / current_cell_count)
+        percent_change = np.abs(100 * (original_cell_count - current_cell_count) / original_cell_count)
         if current_cell_count > original_cell_count:
             title_text += " <span style='color:green'>(add %.2f%%)</span>" % percent_change
         elif current_cell_count < original_cell_count:
@@ -845,7 +948,7 @@ def plot_units(self):
 
     n_cells = len(unique_cells)
 
-    rows, cols = get_grid_dimensions(n_cells, method='auto')
+    rows, cols = get_grid_dimensions(n_cells, method='nper', n=3)
 
     row = 0
     col = 0
@@ -972,8 +1075,10 @@ def manage_features(self):
                 self.samples_per_spike = self.tetrode_data.shape[2]
 
             if self.cut_data is None:
-                cut_data = find_unit([tetrode_filename])
-                self.cut_data = cut_data[0]
+                cut_data = read_cut(self.cut_filename.text())
+                # cut_data = find_unit([tetrode_filename])
+                # self.cut_data = cut_data[0]
+                self.cut_data = cut_data
                 self.cut_data_original = self.cut_data.copy()  # keep a copy of the original to revert if we want.
 
             load_features(self)
@@ -1048,7 +1153,6 @@ def undo_function(self):
             else:
                 # we don't need to worry about this because the reconfigure function will take care of it
                 reconfigure = True
-                pass
 
             # remove the data from the channel it was original moved to
             self.unit_data[toCellIndex][data_chan] = np.delete(self.unit_data[toCellIndex][data_chan],
@@ -1057,7 +1161,7 @@ def undo_function(self):
             if len(self.unit_data[toCellIndex][data_chan]) > 0:
                 # update the toCell subsample_i as well
                 _, subsample_i = findSpikeSubsample(self.unit_data[toCellIndex][data_chan], max_spike_plots)
-                if fromCell not in self.cell_subsample_i.keys():
+                if toCell not in self.cell_subsample_i.keys():
                     self.cell_subsample_i[toCell] = {data_chan: subsample_i}
                 else:
                     self.cell_subsample_i[toCell][data_chan] = subsample_i
@@ -1065,6 +1169,7 @@ def undo_function(self):
                 # there is no data left, don't need to worry about the subsampling anymore
                 if toCell in self.cell_subsample_i.keys():
                     self.cell_subsample_i.pop(toCell)
+                    reconfigure = True
 
         # this cell no longer exists
         for key, value in self.unit_data[toCellIndex].items():

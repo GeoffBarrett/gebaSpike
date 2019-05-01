@@ -1,14 +1,14 @@
 from PyQt5 import QtWidgets, QtGui, QtCore
 import pyqtgraph as pg
 import os
-from core.default_parameters import project_name, channel_range, max_spike_plots, default_move_channel
+from core.default_parameters import project_name, channel_range, max_spike_plots, default_move_channel, max_num_actions
 from core.plot_utils import CustomViewBox, MultiLine, get_channel_color
 import numpy as np
 from core.gui_utils import Communicate
 from functools import partial
 from core.plot_functions import get_index_from_cell, get_cell_from_index, get_channel_from_y, find_spikes_crossed, \
     findSpikeSubsample, replot_unit, moveToChannel, validateMoveValue, setPlotTitle, reconfigure_units, \
-    get_channel_y_edges, undo_function
+    get_channel_y_edges, undo_function, get_next_action, clear_unit
 import time
 
 
@@ -148,7 +148,7 @@ class PopUpCutWindow(QtWidgets.QWidget):
 
         button_layout = QtWidgets.QHBoxLayout()
 
-        self.undo_btn = QtWidgets.QPushButton("Hide")
+        self.undo_btn = QtWidgets.QPushButton("Undo")
         self.undo_btn.clicked.connect(lambda: undo_function(self.mainWindow))
 
         self.hide_btn = QtWidgets.QPushButton("Hide")
@@ -204,7 +204,13 @@ class PopUpCutWindow(QtWidgets.QWidget):
         setTitle = False
         for channel in np.arange(self.n_channels):
 
-            plot_data = self.mainWindow.unit_data[index][channel]
+            if index in self.mainWindow.unit_data.keys():
+                plot_data = self.mainWindow.unit_data[index][channel]
+            else:
+                self.reset_plots()
+                self.hideF()
+                return
+
             plot_data_avg = np.mean(plot_data, axis=0).reshape((1, -1))
 
             current_n = plot_data.shape[0]
@@ -284,15 +290,19 @@ class PopUpCutWindow(QtWidgets.QWidget):
 
         ymin, ymax = get_ylimits(channel, channel_range=channel_range, n_channels=self.n_channels)
 
-        self.channel_plot.setYRange(ymin, ymax, padding=0)
-
         self.channel_plot.addItem(self.channel_plot_lines[self.index][channel])
         self.channel_plot.addItem(self.channel_avg_plot_lines[self.index][channel])
 
+        self.channel_plot.setYRange(ymin, ymax, padding=0)
+
+    def reset_plots(self):
+        self.unit_plot.clear()
+        self.unit_plot.setTitle('')
+        self.channel_plot.clear()
+
     def reset_data(self):
 
-        self.unit_plot.clear()
-        self.channel_plot.clear()
+        self.reset_plots()
 
         self.cell = None
         self.index = None
@@ -366,21 +376,52 @@ def mouse_click_event(self, vb, ev=None):
 
             invalid_index = get_index_from_cell(self.mainWindow, invalid_cell_number)
             # remove these spikes from all the channels
+            reconfigure = False
             for data_chan in np.arange(self.mainWindow.n_channels):
                 # append the crossed lines to the invalid cell's plot
                 if invalid_index is not None:
                     # get the invalid data
                     invalid_cell_data = self.mainWindow.unit_data[self.index][data_chan][crossed_cells, :]
                     # update the invalid_data channel with this current data
-                    self.mainWindow.unit_data[invalid_index][data_chan] = np.vstack((self.mainWindow.unit_data[invalid_index][data_chan],
-                                                                          invalid_cell_data))
+                    self.mainWindow.unit_data[invalid_index][data_chan] = np.vstack((
+                        self.mainWindow.unit_data[invalid_index][data_chan], invalid_cell_data))
+
+                    # update the plotted subsample as well
+                    _, subsample_i = findSpikeSubsample(self.mainWindow.unit_data[invalid_index][data_chan], max_spike_plots)
+                    if invalid_cell_number not in self.mainWindow.cell_subsample_i.keys():
+                        self.mainWindow.cell_subsample_i[invalid_cell_number] = {data_chan: subsample_i}
+                    else:
+                        self.mainWindow.cell_subsample_i[invalid_cell_number][data_chan] = subsample_i
+                else:
+                    reconfigure = True
 
                 self.mainWindow.unit_data[self.index][data_chan] = np.delete(
                     self.mainWindow.unit_data[self.index][data_chan], crossed_cells, axis=0)
 
+                # recalculate subplot for the channel that the spikes were removed from
+                if len(self.mainWindow.unit_data[self.index][data_chan]) > 0:
+                    _, subsample_i = findSpikeSubsample(self.mainWindow.unit_data[self.index][data_chan], max_spike_plots)
+                    if self.cell not in self.mainWindow.cell_subsample_i.keys():
+                        self.mainWindow.cell_subsample_i[self.cell] = {data_chan: subsample_i}
+                    else:
+                        self.mainWindow.cell_subsample_i[self.cell][data_chan] = subsample_i
+                else:
+                    # there is no data left, don't need to worry about the subsampling anymore
+                    if self.cell in self.mainWindow.cell_subsample_i.keys():
+                        self.mainWindow.cell_subsample_i.pop(self.cell)
+                        reconfigure = True
+                '''
                 # update subsample
                 _, subsample_i = findSpikeSubsample(self.mainWindow.unit_data[self.index][data_chan], max_spike_plots)
                 self.mainWindow.cell_subsample_i[self.cell][data_chan] = subsample_i
+                '''
+
+            # check if the cell still exists
+            for key, value in self.mainWindow.unit_data[self.index].items():
+                if len(value) == 0:
+                    self.mainWindow.unit_data.pop(self.index)
+                    reconfigure = True
+                    break
 
             # update the bool
             cell_indices = self.mainWindow.cell_indices[self.cell]
@@ -388,24 +429,40 @@ def mouse_click_event(self, vb, ev=None):
             # append invalid cells to the new cell number
             invalid_cells = cell_indices[crossed_cells]
             self.mainWindow.cell_indices[self.cell] = np.delete(cell_indices, crossed_cells)
-            # re-plot on popup
-            self.plot(self.index, self.cell)
 
-            for roi in self.active_ROI:
-                roi.hide()
+            # check if there are still indices for this cell, if empty we will remove
+            if len(self.mainWindow.cell_indices[self.cell]) == 0:
+                reconfigure = True
+                clear_unit(self.mainWindow, self.cell)  # delete the cell's plots
+                if self.cell in self.mainWindow.original_cell_count.keys():
+                    self.mainWindow.original_cell_count.pop(self.cell)
+                self.mainWindow.cell_indices.pop(self.cell)
 
-            # replot the main Window
-
-            # determine if we need to reconfigure the main window
-            reconfigure = False
             if invalid_cell_number in self.mainWindow.cell_indices.keys():
                 # the cell has existed already within the main window, we can just add to this plot
-                self.mainWindow.cell_indices[invalid_cell_number] = np.concatenate((self.mainWindow.cell_indices[self.cell], invalid_cells))
+                self.mainWindow.cell_indices[invalid_cell_number] = np.concatenate((
+                    self.mainWindow.cell_indices[invalid_cell_number], invalid_cells))
             else:
                 # this cell is not already plotted, have to add the plot and possibly reconfigure
                 self.mainWindow.cell_indices[invalid_cell_number] = invalid_cells
                 reconfigure = True
 
+            # add the latest action
+            if len(self.mainWindow.latest_actions) == 0 or max_num_actions == 1:
+                self.mainWindow.latest_actions = {0: {'action': 'cut', 'fromCell': self.cell,
+                                                      'toCell': invalid_cell_number, 'movedCutIndices': invalid_cells}}
+            else:
+                next_action = get_next_action(self.mainWindow)
+                self.mainWindow.latest_actions[next_action] = {'action': 'cut', 'fromCell': self.cell,
+                                                               'toChannel': invalid_cell_number,
+                                                               'toCell': invalid_cells}
+
+            # re-plot on popup
+            self.plot(self.index, self.cell)
+            for roi in self.active_ROI:
+                roi.hide()
+
+            # replot the main Window
             if not reconfigure:
                 # update plots for the invalid cell and the cell you removed these spikes from
                 # no need to reconfigure
@@ -414,7 +471,9 @@ def mouse_click_event(self, vb, ev=None):
                 replot_unit(self.mainWindow, invalid_index)
             else:
                 # we will need to reconfigure the main window possibly, do so
-                replot_unit(self.mainWindow, self.index)
+
+                if self.cell in self.mainWindow.cell_indices.keys():
+                    replot_unit(self.mainWindow, self.index)
                 unique_cells = np.asarray(list(self.mainWindow.cell_indices.keys()))
                 reconfigure_units(self.mainWindow, list(unique_cells[unique_cells != 0]))
 
@@ -424,7 +483,7 @@ def mouse_click_event(self, vb, ev=None):
 
 def get_ylimits(channel, channel_range=256, n_channels=4):
     edges = get_channel_y_edges(channel_range=channel_range, n_channels=n_channels)
-    return edges[channel], edges[channel+1]
+    return edges[channel+1], edges[channel]
 
 
 def drag(self, mode, vb, ev=None):
