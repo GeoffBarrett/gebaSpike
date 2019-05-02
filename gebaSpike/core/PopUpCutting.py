@@ -8,7 +8,7 @@ from core.gui_utils import Communicate
 from functools import partial
 from core.plot_functions import get_index_from_cell, get_cell_from_index, get_channel_from_y, find_spikes_crossed, \
     findSpikeSubsample, replot_unit, moveToChannel, validateMoveValue, setPlotTitle, reconfigure_units, \
-    get_channel_y_edges, undo_function, get_next_action, clear_unit
+    get_channel_y_edges, undo_function, get_next_action, clear_unit, maxSpikesChange, get_max_spikes
 import time
 
 
@@ -90,6 +90,16 @@ class PopUpCutWindow(QtWidgets.QWidget):
         channel_layout.addWidget(channel_label)
         channel_layout.addWidget(self.channel_number)
 
+        max_spike_label = QtWidgets.QLabel("Max Plot Spikes:")
+        self.max_spike_plots_text = QtWidgets.QLineEdit()
+        self.max_spike_plots_text.setToolTip("This is the maximum number of spikes to plot.")
+        self.max_spike_plots_text.setText(str(max_spike_plots))
+        self.max_spike_plots_text.textChanged.connect(lambda: maxSpikesChange(self, 'popup'))
+
+        max_spikes_layout = QtWidgets.QHBoxLayout()
+        max_spikes_layout.addWidget(max_spike_label)
+        max_spikes_layout.addWidget(self.max_spike_plots_text)
+
         move_to_layout = QtWidgets.QHBoxLayout()
 
         move_to_label = QtWidgets.QLabel("Move to Channel:")
@@ -102,7 +112,7 @@ class PopUpCutWindow(QtWidgets.QWidget):
 
         parameter_layout = QtWidgets.QHBoxLayout()
         parameter_layout.addStretch(1)
-        for object_ in [channel_layout, move_to_layout]:
+        for object_ in [channel_layout, move_to_layout, max_spikes_layout]:
             if 'Layout' in object_.__str__():
                 parameter_layout.addLayout(object_)
                 parameter_layout.addStretch(1)
@@ -371,6 +381,13 @@ def mouse_click_event(self, vb, ev=None):
                 points = np.rint(np.asarray(self.channel_drag_lines.getState()['points']))
                 channel = int(self.channel_number.currentText()) - 1
 
+            if self.mainWindow.max_spike_plots is None:
+                max_spike_plots = get_max_spikes(self.mainWindow)
+                if max_spike_plots is None:
+                    return
+                else:
+                    self.mainWindow.max_spike_plots = max_spike_plots
+
             unit_data = self.mainWindow.unit_data[self.index][channel]
             crossed_cells = find_spikes_crossed(points, unit_data, samples_per_spike=self.samples_per_spike)
 
@@ -387,7 +404,7 @@ def mouse_click_event(self, vb, ev=None):
                         self.mainWindow.unit_data[invalid_index][data_chan], invalid_cell_data))
 
                     # update the plotted subsample as well
-                    _, subsample_i = findSpikeSubsample(self.mainWindow.unit_data[invalid_index][data_chan], max_spike_plots)
+                    _, subsample_i = findSpikeSubsample(self.mainWindow.unit_data[invalid_index][data_chan], self.mainWindow.max_spike_plots)
                     if invalid_cell_number not in self.mainWindow.cell_subsample_i.keys():
                         self.mainWindow.cell_subsample_i[invalid_cell_number] = {data_chan: subsample_i}
                     else:
@@ -400,7 +417,7 @@ def mouse_click_event(self, vb, ev=None):
 
                 # recalculate subplot for the channel that the spikes were removed from
                 if len(self.mainWindow.unit_data[self.index][data_chan]) > 0:
-                    _, subsample_i = findSpikeSubsample(self.mainWindow.unit_data[self.index][data_chan], max_spike_plots)
+                    _, subsample_i = findSpikeSubsample(self.mainWindow.unit_data[self.index][data_chan], self.mainWindow.max_spike_plots)
                     if self.cell not in self.mainWindow.cell_subsample_i.keys():
                         self.mainWindow.cell_subsample_i[self.cell] = {data_chan: subsample_i}
                     else:
@@ -412,7 +429,7 @@ def mouse_click_event(self, vb, ev=None):
                         reconfigure = True
                 '''
                 # update subsample
-                _, subsample_i = findSpikeSubsample(self.mainWindow.unit_data[self.index][data_chan], max_spike_plots)
+                _, subsample_i = findSpikeSubsample(self.mainWindow.unit_data[self.index][data_chan], self.mainWindow.max_spike_plots)
                 self.mainWindow.cell_subsample_i[self.cell][data_chan] = subsample_i
                 '''
 

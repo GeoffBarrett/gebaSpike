@@ -294,14 +294,19 @@ def findSpikeSubsample(data, max_n):
                                            np.argmin(data[non_clipped_cell_i, :], axis=0))
                                           ).flatten())
 
-        remaining_index_choices = np.setdiff1d(np.arange(data.shape[0] - 1), data_i)
+        if data_i.shape[0] < max_n:
 
-        # now just take evenly spaced indices of the remaining choices
-        data_i = np.concatenate((data_i,
-                                 remaining_index_choices[np.linspace(0,
-                                                                     len(remaining_index_choices) - 1,
-                                                                     num=(max_n - len(data_i))
-                                                                     ).astype(int)]))
+            remaining_index_choices = np.setdiff1d(np.arange(data.shape[0] - 1), data_i)
+
+            # now just take evenly spaced indices of the remaining choices
+            data_i = np.concatenate((data_i,
+                                     remaining_index_choices[np.linspace(0,
+                                                                         len(remaining_index_choices) - 1,
+                                                                         num=(max_n - len(data_i))
+                                                                         ).astype(int)]))
+        elif data_i.shape[0] > max_n:
+            data_i = data_i[:max_n]
+
         data = data[data_i, :]
 
     else:
@@ -393,6 +398,13 @@ def mouse_click_event(self, index, ev=None):
             # append the crossed lines to the invalid cell's plot
             invalid_index = get_index_from_cell(self, invalid_cell_number)
 
+            if self.max_spike_plots is None:
+                max_spike_plots = get_max_spikes(self)
+                if max_spike_plots is None:
+                    return
+                else:
+                    self.max_spike_plots = max_spike_plots
+
             reconfigure = False
             # remove these spikes from all the channels
             for data_chan in np.arange(self.n_channels):
@@ -404,7 +416,7 @@ def mouse_click_event(self, index, ev=None):
                                                                           invalid_cell_data))
 
                     # update the plotted subsample as well
-                    _, subsample_i = findSpikeSubsample(self.unit_data[invalid_index][data_chan], max_spike_plots)
+                    _, subsample_i = findSpikeSubsample(self.unit_data[invalid_index][data_chan], self.max_spike_plots)
                     if invalid_cell_number not in self.cell_subsample_i.keys():
                         self.cell_subsample_i[invalid_cell_number] = {data_chan: subsample_i}
                     else:
@@ -417,7 +429,7 @@ def mouse_click_event(self, index, ev=None):
 
                 # recalculate subplot for the channel that the spikes were removed from
                 if len(self.unit_data[index][data_chan]) > 0:
-                    _, subsample_i = findSpikeSubsample(self.unit_data[index][data_chan], max_spike_plots)
+                    _, subsample_i = findSpikeSubsample(self.unit_data[index][data_chan], self.max_spike_plots)
                     if cell not in self.cell_subsample_i.keys():
                         self.cell_subsample_i[cell] = {data_chan: subsample_i}
                     else:
@@ -697,6 +709,13 @@ def reconfigure_units(self, unique_cells):
         old_vb[index] = value
     self.vb = {}
 
+    if self.max_spike_plots is None:
+        max_spike_plots = get_max_spikes(self)
+        if max_spike_plots is None:
+            return
+        else:
+            self.max_spike_plots = max_spike_plots
+
     for index in np.arange(rows*cols):
 
         if index < len(unique_cells):
@@ -817,7 +836,7 @@ def reconfigure_units(self, unique_cells):
                             setPlotTitle(self.unit_plots[index][0], cell, current_cell_count=current_n)
                         setTitle = True
 
-                    cell_data_sub_channel, subsample_i = findSpikeSubsample(plot_data, max_spike_plots)
+                    cell_data_sub_channel, subsample_i = findSpikeSubsample(plot_data, self.max_spike_plots)
 
                     if cell not in self.cell_subsample_i.keys():
                         self.cell_subsample_i[cell] = {channel: subsample_i}
@@ -950,6 +969,13 @@ def plot_units(self):
 
     rows, cols = get_grid_dimensions(n_cells, method='nper', n=3)
 
+    if self.max_spike_plots is None:
+        max_spike_plots = get_max_spikes(self)
+        if max_spike_plots is None:
+            return
+        else:
+            self.max_spike_plots = max_spike_plots
+
     row = 0
     col = 0
     for index in np.arange(len(unique_cells)):
@@ -990,7 +1016,7 @@ def plot_units(self):
 
         self.cell_indices[cell] = cell_bool
 
-        # cell_data_sub = findSpikeSubsample(cell_data, max_spike_plots)
+        # cell_data_sub = findSpikeSubsample(cell_data, self.max_spike_plots)
 
         title_set = False
         for channel in np.arange(self.n_channels):
@@ -1006,7 +1032,7 @@ def plot_units(self):
                              current_cell_count=plot_data.shape[0])
                 title_set = True
 
-            cell_data_sub_channel, subsample_i = findSpikeSubsample(plot_data, max_spike_plots)
+            cell_data_sub_channel, subsample_i = findSpikeSubsample(plot_data, self.max_spike_plots)
 
             if cell not in self.cell_subsample_i.keys():
                 self.cell_subsample_i[cell] = {channel: subsample_i}
@@ -1106,6 +1132,15 @@ def moveToChannel(self, origin):
         self.mainWindow.move_to_channel.setText(self.move_to_channel.text())
 
 
+def maxSpikesChange(self, origin):
+
+    if origin == 'main':
+        self.PopUpCutWindow.max_spike_plots_text.setText(self.max_spike_plots_text.text())
+    elif origin == 'popup':
+        self.mainWindow.max_spike_plots_text.setText(self.max_spike_plots_text.text())
+    self.max_spike_plots = None
+
+
 def validateMoveValue(channel_value):
     """
     Determine if the channel value is valid or not
@@ -1116,6 +1151,21 @@ def validateMoveValue(channel_value):
         return False
     elif channel_value > 30:
         return False
+    return True
+
+
+def validateMaxSpikes(max_spikes):
+    """
+    :param channel_value:
+    :return:
+    """
+    try:
+        max_spike = int(max_spikes)
+        if max_spike < 0:
+            return False
+    except:
+        return False
+
     return True
 
 
@@ -1136,6 +1186,13 @@ def undo_function(self):
         toCellIndex = get_index_from_cell(self, toCell)
         fromCellIndex = get_index_from_cell(self, fromCell)
 
+        if self.max_spike_plots is None:
+            max_spike_plots = get_max_spikes(self)
+            if max_spike_plots is None:
+                return
+            else:
+                self.max_spike_plots = max_spike_plots
+
         reconfigure = False
         for data_chan in np.arange(self.n_channels):
             # add the spike data back to it's original channel
@@ -1147,7 +1204,7 @@ def undo_function(self):
                                                                       moved_cell_data))
 
                 # update the plotted subsample as well
-                _, subsample_i = findSpikeSubsample(self.unit_data[fromCellIndex][data_chan], max_spike_plots)
+                _, subsample_i = findSpikeSubsample(self.unit_data[fromCellIndex][data_chan], self.max_spike_plots)
                 if fromCell not in self.cell_subsample_i.keys():
                     self.cell_subsample_i[fromCell] = {data_chan: subsample_i}
                 else:
@@ -1162,7 +1219,7 @@ def undo_function(self):
 
             if len(self.unit_data[toCellIndex][data_chan]) > 0:
                 # update the toCell subsample_i as well
-                _, subsample_i = findSpikeSubsample(self.unit_data[toCellIndex][data_chan], max_spike_plots)
+                _, subsample_i = findSpikeSubsample(self.unit_data[toCellIndex][data_chan], self.max_spike_plots)
                 if toCell not in self.cell_subsample_i.keys():
                     self.cell_subsample_i[toCell] = {data_chan: subsample_i}
                 else:
@@ -1218,3 +1275,19 @@ def undo_function(self):
 
     else:
         print('The following action has not been coded yet: %s' % latest_action['action'])
+
+
+def get_max_spikes(self):
+
+    max_spike_plots = self.max_spike_plots_text.text()
+    max_spike_valid = validateMaxSpikes(max_spike_plots)
+    if max_spike_valid:
+        max_spike_plots = int(max_spike_plots)
+    else:
+        self.choice = None
+        self.LogError.signal.emit('saveComplete')
+        while self.choice is None:
+            time.sleep(0.1)
+        return None
+
+    return max_spike_plots

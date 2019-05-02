@@ -4,9 +4,9 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
 from core.gui_utils import center, validate_session, Communicate, validate_cut
 from core.default_parameters import project_name, default_filename, defaultXAxis, defaultYAxis, defaultZAxis, openGL, \
-default_move_channel
+default_move_channel, max_spike_plots
 from core.Tint_Matlab import find_tetrodes
-from core.plot_functions import manage_features, feature_name_map, moveToChannel, undo_function
+from core.plot_functions import manage_features, feature_name_map, moveToChannel, undo_function, maxSpikesChange
 from core.PopUpCutting import PopUpCutWindow
 from core.cut_functions import write_cut
 from core.plot_functions import get_index_from_cell
@@ -66,6 +66,8 @@ class MainWindow(QtWidgets.QWidget):
         self.xline = None
         self.yline = None
         self.zline = None
+
+        self.max_spike_plots = None
 
         self.n_channels = None
 
@@ -164,6 +166,18 @@ class MainWindow(QtWidgets.QWidget):
 
         filename_grid_layout.addLayout(line_edit_layout, *(0, 2), 2, 1)
 
+        # -----------
+
+        max_spike_label = QtWidgets.QLabel("Max Plot Spikes:")
+        self.max_spike_plots_text = QtWidgets.QLineEdit()
+        self.max_spike_plots_text.setToolTip("This is the maximum number of spikes to plot.")
+        self.max_spike_plots_text.setText(str(max_spike_plots))
+        self.max_spike_plots_text.textChanged.connect(lambda: maxSpikesChange(self, 'main'))
+
+        max_spikes_layout = QtWidgets.QHBoxLayout()
+        max_spikes_layout.addWidget(max_spike_label)
+        max_spikes_layout.addWidget(self.max_spike_plots_text)
+
         # ------- move invalid -----------
 
         move_to_channel_label = QtWidgets.QLabel("Move to Channel:")
@@ -227,7 +241,7 @@ class MainWindow(QtWidgets.QWidget):
         tetrode_layout.addWidget(tetrode_label)
         tetrode_layout.addWidget(self.tetrode_cb)
 
-        spike_parameter_widgets = [tetrode_layout, axis_layout, move_to_channel_layout]
+        spike_parameter_widgets = [tetrode_layout, axis_layout, move_to_channel_layout, max_spikes_layout]
 
         spike_parameter_layout.addStretch(1)
         for i, widget in enumerate(spike_parameter_widgets):
@@ -342,6 +356,11 @@ class MainWindow(QtWidgets.QWidget):
             return
         else:
             write_cut(save_filename, cut_values)
+            self.choice = None
+            self.LogError.signal.emit('saveComplete')
+            while self.choice is None:
+                time.sleep(0.1)
+            return
 
     def close_app(self):
         """This method will prompt the user, asking if they would like to quit or not"""
@@ -426,6 +445,16 @@ class MainWindow(QtWidgets.QWidget):
                                                          "want to overwrite this file?" % cut_file,
                                                          QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
 
+        elif 'saveComplete' in error:
+            self.choice = QtWidgets.QMessageBox.question(self, "Save Complete",
+                                                         "Your cut file has been saved successfully!",
+                                                         QtWidgets.QMessageBox.Ok)
+
+        elif 'invalidMaxSpikes' in error:
+            self.choice = QtWidgets.QMessageBox.question(self, "Invalid Max Spikes",
+                                                         "The number chosen for Max Spikes is invalid!",
+                                                         QtWidgets.QMessageBox.Ok)
+
     def get_settings(self):
         settings = {}
         if os.path.exists(self.settings_filename):
@@ -445,6 +474,8 @@ class MainWindow(QtWidgets.QWidget):
         self.cut_data_original = None
         self.n_channels = None
         self.spike_times = None
+
+        self.max_spike_plots = None
 
         self.cell_indices = {}
         self.plot_lines = {}
