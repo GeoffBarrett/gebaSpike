@@ -341,7 +341,7 @@ class MainWindow(QtWidgets.QWidget):
                 time.sleep(0.1)
             return
         else:
-            write_cut(self, save_filename, cut_values)
+            write_cut(save_filename, cut_values)
 
     def close_app(self):
         """This method will prompt the user, asking if they would like to quit or not"""
