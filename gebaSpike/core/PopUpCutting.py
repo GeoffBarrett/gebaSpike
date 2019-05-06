@@ -6,9 +6,11 @@ from core.plot_utils import CustomViewBox, MultiLine, get_channel_color
 import numpy as np
 from core.gui_utils import Communicate
 from functools import partial
-from core.plot_functions import get_index_from_cell, get_cell_from_index, get_channel_from_y, find_spikes_crossed, \
-    findSpikeSubsample, replot_unit, moveToChannel, validateMoveValue, setPlotTitle, reconfigure_units, \
-    get_channel_y_edges, undo_function, get_next_action, clear_unit, maxSpikesChange, get_max_spikes
+from core.plot_functions import replot_unit, reconfigure_units
+from core.waveform_cut_functions import get_channel_from_y, get_channel_y_edges, findSpikeSubsample, \
+    get_index_from_cell, get_max_spikes, setPlotTitle, find_spikes_crossed, validateMoveValue, clear_unit, \
+    maxSpikesChange, moveToChannel, get_next_action
+from core.undo import undo_function
 import time
 
 
@@ -93,7 +95,7 @@ class PopUpCutWindow(QtWidgets.QWidget):
         max_spike_label = QtWidgets.QLabel("Max Plot Spikes:")
         self.max_spike_plots_text = QtWidgets.QLineEdit()
         self.max_spike_plots_text.setToolTip("This is the maximum number of spikes to plot.")
-        self.max_spike_plots_text.setText(str(max_spike_plots))
+        self.max_spike_plots_text.setText(self.mainWindow.max_spike_plots_text.text())
         self.max_spike_plots_text.textChanged.connect(lambda: maxSpikesChange(self, 'popup'))
 
         max_spikes_layout = QtWidgets.QHBoxLayout()
@@ -104,7 +106,7 @@ class PopUpCutWindow(QtWidgets.QWidget):
 
         move_to_label = QtWidgets.QLabel("Move to Channel:")
         self.move_to_channel = QtWidgets.QLineEdit()
-        self.move_to_channel.setText(default_move_channel)
+        self.move_to_channel.setText(self.mainWindow.move_to_channel.text())
         self.move_to_channel.textChanged.connect(lambda: moveToChannel(self, 'popup'))
 
         move_to_layout.addWidget(move_to_label)
@@ -129,9 +131,9 @@ class PopUpCutWindow(QtWidgets.QWidget):
         self.channel_plot.setMouseEnabled(x=False, y=False)  # disables the mouse interactions
         self.channel_plot.enableAutoRange(False, False)
         self.vb_channel_plot = self.channel_plot.vb
-        self.vb_channel_plot.mouseDragEvent = partial(drag, self, 'channel',
+        self.vb_channel_plot.mouseDragEvent = partial(dragPopup, self, 'channel',
                                                    self.vb_channel_plot)  # overriding the drag event
-        self.vb_channel_plot.mouseClickEvent = partial(mouse_click_event, self, self.vb_channel_plot)
+        self.vb_channel_plot.mouseClickEvent = partial(mouse_click_eventPopup, self, self.vb_channel_plot)
 
         self.channel_drag_lines = None
 
@@ -145,8 +147,8 @@ class PopUpCutWindow(QtWidgets.QWidget):
 
         self.vb_unit_plot = self.unit_plot.vb
 
-        self.vb_unit_plot.mouseDragEvent = partial(drag, self, 'unit', self.vb_unit_plot)  # overriding the drag event
-        self.vb_unit_plot.mouseClickEvent = partial(mouse_click_event, self, self.vb_unit_plot)
+        self.vb_unit_plot.mouseDragEvent = partial(dragPopup, self, 'unit', self.vb_unit_plot)  # overriding the drag event
+        self.vb_unit_plot.mouseClickEvent = partial(mouse_click_eventPopup, self, self.vb_unit_plot)
 
         self.unit_drag_lines = None
 
@@ -164,10 +166,11 @@ class PopUpCutWindow(QtWidgets.QWidget):
         self.hide_btn = QtWidgets.QPushButton("Hide")
         self.hide_btn.clicked.connect(self.hideF)
 
-        button_layout.addStretch(1)
-        for widget in [self.undo_btn, self.hide_btn]:
+        self.cancel_btn = QtWidgets.QPushButton("Cancel")
+        self.cancel_btn.clicked.connect(self.cancel)
+
+        for widget in [self.undo_btn, self.hide_btn, self.cancel_btn]:
             button_layout.addWidget(widget)
-            button_layout.addStretch(1)
 
         # adding all widgets/layouts to the main layout
 
@@ -187,6 +190,10 @@ class PopUpCutWindow(QtWidgets.QWidget):
                     popupLayout.addStretch(1)
 
         self.setLayout(popupLayout)  # defining the layout of the Main Window
+
+    def cancel(self):
+        self.hideF()
+        self.mainWindow.PopUpCutWindow.pop(self.cell)
 
     def hideF(self):
         self.hide()
@@ -217,8 +224,8 @@ class PopUpCutWindow(QtWidgets.QWidget):
             if index in self.mainWindow.unit_data.keys():
                 plot_data = self.mainWindow.unit_data[index][channel]
             else:
-                self.reset_plots()
-                self.hideF()
+                # self.reset_plots()
+                self.cancel()
                 return
 
             plot_data_avg = np.mean(plot_data, axis=0).reshape((1, -1))
@@ -330,7 +337,40 @@ class PopUpCutWindow(QtWidgets.QWidget):
         self.channel_plot_lines = {}
 
 
-def mouse_click_event(self, vb, ev=None):
+def get_ylimits(channel, channel_range=256, n_channels=4):
+    edges = get_channel_y_edges(channel_range=channel_range, n_channels=n_channels)
+    return edges[channel+1], edges[channel]
+
+
+def dragPopup(self, mode, vb, ev=None):
+    # global vb, lr
+    if ev.button() == QtCore.Qt.LeftButton:
+
+        # defining the start of the selected region
+        points = [[vb.mapToView(ev.buttonDownPos()).x(),
+                   vb.mapToView(ev.buttonDownPos()).y()],
+                  [vb.mapToView(ev.pos()).x(),
+                   vb.mapToView(ev.pos()).y()]]
+
+        if mode == 'unit':
+            self.unit_plot.removeItem(self.unit_drag_lines)
+            self.unit_drag_lines = pg.PolyLineROI(points)
+            self.unit_plot.addItem(self.unit_drag_lines)
+            self.active_ROI = [self.unit_drag_lines]
+            self.drag_active = True
+        elif mode == 'channel':
+            self.channel_plot.removeItem(self.channel_drag_lines)
+            self.channel_drag_lines = pg.PolyLineROI(points)
+            self.channel_plot.addItem(self.channel_drag_lines)
+            self.active_ROI = [self.channel_drag_lines]
+            self.drag_active = True
+
+        ev.accept()
+    else:
+        pg.ViewBox.mouseDragEvent(vb, ev)
+
+
+def mouse_click_eventPopup(self, vb, ev=None):
 
     if ev.button() == QtCore.Qt.RightButton:
         # open menu
@@ -427,18 +467,14 @@ def mouse_click_event(self, vb, ev=None):
                     if self.cell in self.mainWindow.cell_subsample_i.keys():
                         self.mainWindow.cell_subsample_i.pop(self.cell)
                         reconfigure = True
-                '''
-                # update subsample
-                _, subsample_i = findSpikeSubsample(self.mainWindow.unit_data[self.index][data_chan], self.mainWindow.max_spike_plots)
-                self.mainWindow.cell_subsample_i[self.cell][data_chan] = subsample_i
-                '''
 
             # check if the cell still exists
             for key, value in self.mainWindow.unit_data[self.index].items():
                 if len(value) == 0:
-                    self.mainWindow.unit_data.pop(self.index)
-                    reconfigure = True
-                    break
+                    if self.index != -1:
+                        self.mainWindow.unit_data.pop(self.index)
+                        reconfigure = True
+                        break
 
             # update the bool
             cell_indices = self.mainWindow.cell_indices[self.cell]
@@ -453,7 +489,8 @@ def mouse_click_event(self, vb, ev=None):
                 clear_unit(self.mainWindow, self.cell)  # delete the cell's plots
                 if self.cell in self.mainWindow.original_cell_count.keys():
                     self.mainWindow.original_cell_count.pop(self.cell)
-                self.mainWindow.cell_indices.pop(self.cell)
+                if self.cell != 0:
+                    self.mainWindow.cell_indices.pop(self.cell)
 
             if invalid_cell_number in self.mainWindow.cell_indices.keys():
                 # the cell has existed already within the main window, we can just add to this plot
@@ -462,7 +499,9 @@ def mouse_click_event(self, vb, ev=None):
             else:
                 # this cell is not already plotted, have to add the plot and possibly reconfigure
                 self.mainWindow.cell_indices[invalid_cell_number] = invalid_cells
-                reconfigure = True
+
+                if invalid_cell_number != 0:
+                    reconfigure = True
 
             # add the latest action
             if len(self.mainWindow.latest_actions) == 0 or max_num_actions == 1:
@@ -471,21 +510,22 @@ def mouse_click_event(self, vb, ev=None):
             else:
                 next_action = get_next_action(self.mainWindow)
                 self.mainWindow.latest_actions[next_action] = {'action': 'cut', 'fromCell': self.cell,
-                                                               'toChannel': invalid_cell_number,
-                                                               'toCell': invalid_cells}
+                                                               'toCell': invalid_cell_number,
+                                                               'movedCutIndices': invalid_cells}
 
             # re-plot on popup
             self.plot(self.index, self.cell)
             for roi in self.active_ROI:
                 roi.hide()
 
-            # replot the main Window
+            # re-plot the main Window
             if not reconfigure:
                 # update plots for the invalid cell and the cell you removed these spikes from
                 # no need to reconfigure
                 replot_unit(self.mainWindow, self.index)
                 invalid_index = get_index_from_cell(self.mainWindow, invalid_cell_number)
-                replot_unit(self.mainWindow, invalid_index)
+                if invalid_index != -1:
+                    replot_unit(self.mainWindow, invalid_index)
             else:
                 # we will need to reconfigure the main window possibly, do so
 
@@ -496,36 +536,3 @@ def mouse_click_event(self, vb, ev=None):
 
             self.drag_active = False
             self.mainWindow.actions_made = True
-
-
-def get_ylimits(channel, channel_range=256, n_channels=4):
-    edges = get_channel_y_edges(channel_range=channel_range, n_channels=n_channels)
-    return edges[channel+1], edges[channel]
-
-
-def drag(self, mode, vb, ev=None):
-    # global vb, lr
-    if ev.button() == QtCore.Qt.LeftButton:
-
-        # defining the start of the selected region
-        points = [[vb.mapToView(ev.buttonDownPos()).x(),
-                   vb.mapToView(ev.buttonDownPos()).y()],
-                  [vb.mapToView(ev.pos()).x(),
-                   vb.mapToView(ev.pos()).y()]]
-
-        if mode == 'unit':
-            self.unit_plot.removeItem(self.unit_drag_lines)
-            self.unit_drag_lines = pg.PolyLineROI(points)
-            self.unit_plot.addItem(self.unit_drag_lines)
-            self.active_ROI = [self.unit_drag_lines]
-            self.drag_active = True
-        elif mode == 'channel':
-            self.channel_plot.removeItem(self.channel_drag_lines)
-            self.channel_drag_lines = pg.PolyLineROI(points)
-            self.channel_plot.addItem(self.channel_drag_lines)
-            self.active_ROI = [self.channel_drag_lines]
-            self.drag_active = True
-
-        ev.accept()
-    else:
-        pg.ViewBox.mouseDragEvent(vb, ev)

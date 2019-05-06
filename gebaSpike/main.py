@@ -2,14 +2,17 @@ import sys
 import pyqtgraph as pg
 from PyQt5 import QtCore, QtGui, QtWidgets
 from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
-from core.gui_utils import center, validate_session, Communicate, validate_cut
+from core.gui_utils import validate_session, Communicate, validate_cut
 from core.default_parameters import project_name, default_filename, defaultXAxis, defaultYAxis, defaultZAxis, openGL, \
-default_move_channel, max_spike_plots
+    default_move_channel, max_spike_plots
 from core.Tint_Matlab import find_tetrodes
-from core.plot_functions import manage_features, feature_name_map, moveToChannel, undo_function, maxSpikesChange
+from core.plot_functions import plot_session
+from core.waveform_cut_functions import moveToChannel, maxSpikesChange
+from core.undo import undo_function
+from core.feature_plot import feature_name_map
 from core.PopUpCutting import PopUpCutWindow
-from core.cut_functions import write_cut
-from core.plot_functions import get_index_from_cell
+from core.writeCut import write_cut
+# from core.plot_functions import get_index_from_cell
 import pyqtgraph.opengl as gl
 import os
 import json
@@ -117,7 +120,8 @@ class MainWindow(QtWidgets.QWidget):
         # pg.setConfigOption('foreground', 'k')
         pg.setConfigOptions(antialias=True)
 
-        self.PopUpCutWindow = PopUpCutWindow(self)
+        self.PopUpCutWindow = {}
+        # self.PopUpCutWindow = PopUpCutWindow(self)
 
         QtWidgets.QApplication.setStyle(QtWidgets.QStyleFactory.create('GTK+'))
 
@@ -151,7 +155,6 @@ class MainWindow(QtWidgets.QWidget):
         cut_filename_label = QtWidgets.QLabel("Cut Filename:")
         self.cut_filename = QtWidgets.QLineEdit()
         self.cut_filename.setText(default_filename)
-        # self.cut_filename.textChanged.connect(self.cut_filename_changed)
         self.cut_filename.setToolTip('The name of the cut file containing the sorted values!')
         self.choose_cut_filename_btn = QtWidgets.QPushButton("Choose Cut Filename")
         self.choose_cut_filename_btn.setToolTip('This button will allow you to choose a cut file to use!')
@@ -276,7 +279,7 @@ class MainWindow(QtWidgets.QWidget):
         button_layout = QtWidgets.QHBoxLayout()
 
         self.plot_btn = QtWidgets.QPushButton("Plot")
-        self.plot_btn.clicked.connect(lambda: manage_features(self))
+        self.plot_btn.clicked.connect(lambda: plot_session(self))
 
         self.reload_cut_btn = QtWidgets.QPushButton("Reload Cut")
         self.reload_cut_btn.clicked.connect(self.reload_cut)
@@ -320,6 +323,10 @@ class MainWindow(QtWidgets.QWidget):
 
         self.show()  # shows the window
 
+    def addPopup(self, cell):
+        self.PopUpCutWindow[cell] = PopUpCutWindow(self)
+
+
     def save_function(self):
 
         if self.cut_filename.text() == default_filename:
@@ -340,27 +347,38 @@ class MainWindow(QtWidgets.QWidget):
             return
 
         # organize the cut data
-        n_spikes = self.tetrode_data.shape[1]
-        cut_values = np.zeros((n_spikes))
+        n_spikes_expected = self.tetrode_data.shape[1]
+        n_spikes = len(np.asarray([item for sublist in self.cell_indices.values() for item in sublist]))
 
-        for cell, cell_indices in self.cell_indices.items():
-            cut_values[cell_indices] = cell
-
-        # save the cut filename
-
-        if len(cut_values) != len(self.cut_data_original):
+        # check that with the manipulation of the spikes, that we still have the correct number of spikes
+        if n_spikes != n_spikes_expected:
             self.choice = None
             self.LogError.signal.emit('cutSizeError')
             while self.choice is None:
                 time.sleep(0.1)
             return
-        else:
-            write_cut(save_filename, cut_values)
+
+        # we will check if we are missing some of the spikes somehow. If we kept track of them, then the indices from
+        # the spikes, when sorted, should produce an array from 0 -> N-1 spikes.
+        if not np.array_equal(np.sort(np.asarray([item for sublist in self.cell_indices.values() for item in sublist])),
+                          np.arange(len(self.cut_data_original))):
             self.choice = None
-            self.LogError.signal.emit('saveComplete')
+            self.LogError.signal.emit('cutIndexError')
             while self.choice is None:
                 time.sleep(0.1)
             return
+
+        cut_values = np.zeros(n_spikes)
+        for cell, cell_indices in self.cell_indices.items():
+            cut_values[cell_indices] = cell
+
+        # save the cut filename
+        write_cut(save_filename, cut_values)
+        self.choice = None
+        self.LogError.signal.emit('saveComplete')
+        while self.choice is None:
+            time.sleep(0.1)
+        return
 
     def close_app(self):
         """This method will prompt the user, asking if they would like to quit or not"""
@@ -395,6 +413,11 @@ class MainWindow(QtWidgets.QWidget):
                                                          "The following session filename is invalid: \n%s\nPlease" %
                                                          session +
                                                          " ensure that the appropriate files exist for this session.",
+                                                         QtWidgets.QMessageBox.Ok)
+
+        elif 'cutIndexError' in error:
+            self.choice = QtWidgets.QMessageBox.question(self, "Cut Index Error!",
+                                                         "The cut output is missing some of the spikes!",
                                                          QtWidgets.QMessageBox.Ok)
 
         elif 'cutSizeError' in error:
@@ -487,6 +510,8 @@ class MainWindow(QtWidgets.QWidget):
         self.unit_positions = {}
         self.original_cell_count = {}
 
+        self.PopUpCutWindow = {}
+
         self.latest_actions = {}
 
         self.actions_made = False
@@ -563,7 +588,7 @@ class MainWindow(QtWidgets.QWidget):
             self.reset_plots()
             self.reset_parameters()
 
-            manage_features(self)
+            plot_session(self)
 
     def choose_filename(self):
         """

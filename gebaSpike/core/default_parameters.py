@@ -21,6 +21,6 @@ default_move_channel = str(0)
 
 channel_range = 256
 
-max_spike_plots = 1000
+max_spike_plots = 2000
 
-max_num_actions = 1  # max number of actions to remember
+max_num_actions = 5  # max number of actions to remember

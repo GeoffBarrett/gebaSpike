@@ -2,6 +2,7 @@ import pyqtgraph as pg
 from PyQt5 import QtCore, QtGui, QtWidgets
 import numpy as np
 from exporters import ImageExporter
+from core.default_parameters import feature_spike_opacity
 
 
 def get_channel_color(cell_number):
@@ -143,4 +144,26 @@ class MultiLine(pg.QtGui.QGraphicsPathItem):
         if self._boundingRect is None:
             self._boundingRect = self.path.boundingRect()
         return self._boundingRect
+
+
+def get_spike_colors(self):
+    """
+    This function will get the colors of the spike so we can plot them using the same colors that Tint uses.
+
+    :param self: the main window object
+    :return: None
+    """
+    n_spikes = self.tetrode_data.shape[1]
+
+    self.spike_colors = np.ones((n_spikes, 4))
+    self.spike_colors[:, -1] = feature_spike_opacity
+
+    unique_cells = np.unique(self.cut_data)
+    # the 0'th cell is the dummy cell for Tint so we will remove that
+    unique_cells = unique_cells[unique_cells != 0]
+    for cell in unique_cells:
+        cell_color = get_channel_color(cell)
+        cell_bool = np.where(self.cut_data == cell)[0]
+        self.spike_colors[cell_bool, :-1] = np.asarray(cell_color)/255
+
 
