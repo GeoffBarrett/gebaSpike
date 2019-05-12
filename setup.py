@@ -10,7 +10,7 @@ pkg_name = "gebaSpike"
 
 setuptools.setup(
     name=pkg_name,
-    version="1.0.0",
+    version="1.0.3",
     author="Geoffrey Barrett",
     author_email="geoffrey.m.barrett@gmail.com",
     description="gebaSpike - GUI designed to improve manual spike sorting of in-vivo electrophysiology data.",
@@ -22,9 +22,11 @@ setuptools.setup(
     [
         'PyQtGraph',
         'PyQt5',
+        'matplotlib',
+        'numpy',
         'scipy',
         'PyOpenGl',
-        'sklearn'
+        'sklearn',
     ],
     package_data={'gebaSpike': ['img/*.png']},
     classifiers=[
