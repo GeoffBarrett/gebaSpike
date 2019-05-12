@@ -1,16 +1,16 @@
 from PyQt5 import QtWidgets, QtGui, QtCore
 import pyqtgraph as pg
 import os
-from core.default_parameters import project_name, channel_range, max_spike_plots, default_move_channel, max_num_actions
-from core.plot_utils import CustomViewBox, MultiLine, get_channel_color
+from .default_parameters import project_name, channel_range, max_spike_plots, default_move_channel, max_num_actions
+from .plot_utils import CustomViewBox, MultiLine, get_channel_color
 import numpy as np
-from core.gui_utils import Communicate
+from .gui_utils import Communicate
 from functools import partial
-from core.plot_functions import replot_unit, reconfigure_units
-from core.waveform_cut_functions import get_channel_from_y, get_channel_y_edges, findSpikeSubsample, \
+from .plot_functions import replot_unit, reconfigure_units
+from .waveform_cut_functions import get_channel_from_y, get_channel_y_edges, findSpikeSubsample, \
     get_index_from_cell, get_max_spikes, setPlotTitle, find_spikes_crossed, validateMoveValue, clear_unit, \
     maxSpikesChange, moveToChannel, get_next_action
-from core.undo import undo_function
+from .undo import undo_function
 import time
 
 

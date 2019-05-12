@@ -2,7 +2,7 @@ import pyqtgraph as pg
 from PyQt5 import QtCore, QtGui, QtWidgets
 import numpy as np
 from exporters import ImageExporter
-from core.default_parameters import feature_spike_opacity
+from .default_parameters import feature_spike_opacity
 
 
 def get_channel_color(cell_number):

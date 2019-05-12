@@ -16,14 +16,15 @@ setuptools.setup(
     description="gebaSpike - GUI designed to improve manual spike sorting of in-vivo electrophysiology data.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/GeoffBarrett/gebaSpikegit",
+    url="https://github.com/GeoffBarrett/gebaSpike.git",
     packages=pkgs,
     install_requires=
     [
         'PyQtGraph',
         'PyQt5',
         'scipy',
-        'PyOpenGl'
+        'PyOpenGl',
+        'sklearn'
     ],
     package_data={'gebaSpike': ['img/*.png']},
     classifiers=[

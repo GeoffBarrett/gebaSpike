@@ -1,12 +1,12 @@
 import os
 import time
 import numpy as np
-from core.default_parameters import channel_range, max_num_actions
-from core.gui_utils import validate_session
-from core.Tint_Matlab import getspikes, read_cut
-from core.plot_utils import CustomViewBox, get_channel_color, MultiLine
-from core.feature_plot import load_features, plot_features
-from core.waveform_cut_functions import findSpikeSubsample, get_index_from_cell, \
+from .default_parameters import channel_range, max_num_actions
+from .gui_utils import validate_session
+from .Tint_Matlab import getspikes, read_cut
+from .plot_utils import CustomViewBox, get_channel_color, MultiLine
+from .feature_plot import load_features, plot_features
+from .waveform_cut_functions import findSpikeSubsample, get_index_from_cell, \
     get_index_from_old_cell, get_cell_from_index, setPlotTitle, get_channel_from_y, validateMoveValue, \
     find_spikes_crossed, get_max_spikes, get_next_action, get_old_index_from_position, get_grid_dimensions, clear_unit
 import pyqtgraph as pg

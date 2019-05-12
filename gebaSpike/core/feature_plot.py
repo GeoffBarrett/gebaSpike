@@ -1,6 +1,6 @@
-from core.feature_functions import CreateFeatures
-from core.default_parameters import openGL, gridLines, feature_spike_size
-from core.plot_utils import get_spike_colors
+from .feature_functions import CreateFeatures
+from .default_parameters import openGL, gridLines, feature_spike_size
+from .plot_utils import get_spike_colors
 import pyqtgraph.opengl as gl
 import numpy as np
 

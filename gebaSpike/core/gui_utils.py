@@ -1,5 +1,5 @@
 from PyQt5 import QtWidgets, QtCore
-from core.default_parameters import default_filename
+from .default_parameters import default_filename
 import time
 import os
 
