@@ -161,6 +161,9 @@ def get_spike_colors(self):
     unique_cells = np.unique(self.cut_data)
     # the 0'th cell is the dummy cell for Tint so we will remove that
     unique_cells = unique_cells[unique_cells != 0]
+
+    self.spike_colors[np.where(self.cut_data == 0)[0], :] = np.zeros(4)
+
     for cell in unique_cells:
         cell_color = get_channel_color(cell)
         cell_bool = np.where(self.cut_data == cell)[0]
