@@ -1,6 +1,6 @@
 import numpy as np
-from core.waveform_cut_functions import get_index_from_cell, get_max_spikes, findSpikeSubsample
-from core.plot_functions import replot_unit, reconfigure_units
+from .waveform_cut_functions import get_index_from_cell, get_max_spikes, findSpikeSubsample
+from .plot_functions import replot_unit, reconfigure_units
 
 
 def undo_function(self):
