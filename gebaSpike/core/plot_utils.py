@@ -9,6 +9,10 @@ def get_channel_color(cell_number):
 
     """This method will match the cell number with the color it should be RGB in Tint.
     These cells are numbered from 1-30 (there is technically a zeroth cell, but that isn't plotted"""
+
+    if cell_number is None:
+        raise ValueError("The cell_number cannot be none!")
+
     spike_colors = [(1, 8, 184), (93, 249, 75), (234, 8, 9),
                     (229, 22, 239), (80, 205, 243), (27, 164, 0),
                     (251, 188, 56), (27, 143, 167), (127, 41, 116),

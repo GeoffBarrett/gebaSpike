@@ -61,14 +61,14 @@ class PopUpCutWindow(QtWidgets.QWidget):
     def raiseError(self, error):
 
         if 'InvalidMoveChannel' in error:
-            self.choice = QtWidgets.QMessageBox.question(self, "Invalid Move to Channel Value!",
-                                                         "The value you have chosen for the 'Move to Channel' value is "
+            self.choice = QtWidgets.QMessageBox.question(self, "Invalid Move to Cell Value!",
+                                                         "The value you have chosen for the 'Move to Cell' value is "
                                                          "invalid, please choose a valid value before continuing!",
                                                          QtWidgets.QMessageBox.Ok)
 
         elif 'SameChannelInvalid' in error:
             self.choice = QtWidgets.QMessageBox.question(self, "Same Channel Error!",
-                                                         "The value you have chosen for the 'Move to Channel' value is "
+                                                         "The value you have chosen for the 'Move to Cell' value is "
                                                          "the same as the cell you are cutting from! If you would like "
                                                          "to move these selected spikes to a different channel, please "
                                                          "choose another channel!",
@@ -104,7 +104,7 @@ class PopUpCutWindow(QtWidgets.QWidget):
 
         move_to_layout = QtWidgets.QHBoxLayout()
 
-        move_to_label = QtWidgets.QLabel("Move to Channel:")
+        move_to_label = QtWidgets.QLabel("Move to Cell:")
         self.move_to_channel = QtWidgets.QLineEdit()
         self.move_to_channel.setText(self.mainWindow.move_to_channel.text())
         self.move_to_channel.textChanged.connect(lambda: moveToChannel(self, 'popup'))

@@ -3,7 +3,7 @@ import time
 import numpy as np
 from .default_parameters import channel_range, max_num_actions
 from .gui_utils import validate_session
-from .Tint_Matlab import getspikes, read_cut
+from .Tint_Matlab import getspikes, read_cut, read_clu
 from .plot_utils import CustomViewBox, get_channel_color, MultiLine
 from .feature_plot import load_features, plot_features
 from .waveform_cut_functions import findSpikeSubsample, get_index_from_cell, \
@@ -515,7 +515,12 @@ def plot_session(self):
                 self.samples_per_spike = self.tetrode_data.shape[2]
 
             if self.cut_data is None:
-                cut_data = read_cut(self.cut_filename.text())
+                filename = self.cut_filename.text()  # the data filename (could be .cut or .clu file)
+                if '.clu.' in filename:
+                    cut_data = read_clu(filename)
+                else:
+                    cut_data = read_cut(filename)
+
                 self.cut_data = cut_data
                 self.cut_data_original = self.cut_data.copy()  # keep a copy of the original to revert if we want.
 

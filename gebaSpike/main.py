@@ -11,7 +11,7 @@ from core.waveform_cut_functions import moveToChannel, maxSpikesChange
 from core.undo import undo_function
 from core.feature_plot import feature_name_map
 from core.PopUpCutting import PopUpCutWindow
-from core.writeCut import write_cut
+from core.writeCut import write_cut, write_clu
 # from core.plot_functions import get_index_from_cell
 import pyqtgraph.opengl as gl
 import os
@@ -183,7 +183,7 @@ class MainWindow(QtWidgets.QWidget):
 
         # ------- move invalid -----------
 
-        move_to_channel_label = QtWidgets.QLabel("Move to Channel:")
+        move_to_channel_label = QtWidgets.QLabel("Move to Cell:")
         self.move_to_channel = QtWidgets.QLineEdit()
         self.move_to_channel.setToolTip("This is the channel that you will move selected cells too.")
         self.move_to_channel.setText(default_move_channel)
@@ -281,7 +281,7 @@ class MainWindow(QtWidgets.QWidget):
         self.plot_btn = QtWidgets.QPushButton("Plot")
         self.plot_btn.clicked.connect(lambda: plot_session(self))
 
-        self.reload_cut_btn = QtWidgets.QPushButton("Reload Cut")
+        self.reload_cut_btn = QtWidgets.QPushButton("Reload Cut/Clu")
         self.reload_cut_btn.clicked.connect(self.reload_cut)
 
         self.save_btn = QtWidgets.QPushButton("Save Cut")
@@ -325,7 +325,6 @@ class MainWindow(QtWidgets.QWidget):
 
     def addPopup(self, cell):
         self.PopUpCutWindow[cell] = PopUpCutWindow(self)
-
 
     def save_function(self):
 
@@ -372,13 +371,22 @@ class MainWindow(QtWidgets.QWidget):
         for cell, cell_indices in self.cell_indices.items():
             cut_values[cell_indices] = cell
 
-        # save the cut filename
-        write_cut(save_filename, cut_values)
-        self.choice = None
-        self.LogError.signal.emit('saveComplete')
-        while self.choice is None:
-            time.sleep(0.1)
-        return
+        if '.clu.' in save_filename:
+            # save the .clu filename
+            write_clu(save_filename, cut_values)
+            self.choice = None
+            self.LogError.signal.emit('saveCompleteClu')
+            while self.choice is None:
+                time.sleep(0.1)
+            return
+        else:
+            # save the cut filename
+            write_cut(save_filename, cut_values)
+            self.choice = None
+            self.LogError.signal.emit('saveComplete')
+            while self.choice is None:
+                time.sleep(0.1)
+            return
 
     def close_app(self):
         """This method will prompt the user, asking if they would like to quit or not"""
@@ -394,11 +402,8 @@ class MainWindow(QtWidgets.QWidget):
             pass
 
     def raiseError(self, error):
-
         if 'TetrodeExistError' in error:
-
             filename = error.split('!')[1]
-
             self.choice = QtWidgets.QMessageBox.question(self, "Tetrode Filename Does Not Exist!",
                                                          "The following tetrode filename does not exist: \n%s\nPlease" %
                                                          filename +
@@ -407,7 +412,6 @@ class MainWindow(QtWidgets.QWidget):
                                                          QtWidgets.QMessageBox.Ok)
 
         elif 'InvalidSession' in error:
-
             session = error.split('!')[1]
             self.choice = QtWidgets.QMessageBox.question(self, "Invalid Session Filename!",
                                                          "The following session filename is invalid: \n%s\nPlease" %
@@ -422,11 +426,11 @@ class MainWindow(QtWidgets.QWidget):
 
         elif 'cutSizeError' in error:
             self.choice = QtWidgets.QMessageBox.question(self, "Cut Size Error!",
-                                                         "Trying to save an inappropriate number of spikes, cannot save cut file!",
+                                                         "Trying to save an inappropriate number of spikes, cannot " +
+                                                         "save cut file!",
                                                          QtWidgets.QMessageBox.Ok)
 
         elif 'InvalidCut' in error:
-
             session = error.split('!')[1]
             self.choice = QtWidgets.QMessageBox.question(self, "Invalid Cut/Clu Filename!",
                                                          "The following Cut filename is invalid: \n%s\nPlease" %
@@ -435,42 +439,46 @@ class MainWindow(QtWidgets.QWidget):
                                                          QtWidgets.QMessageBox.Ok)
 
         elif 'ChooseSession' in error:
-
             self.choice = QtWidgets.QMessageBox.question(self, "Choose Session Filename!",
                                                          "You have not chosen a session file yet! Please choose a"
                                                          " session filename before proceeding!",
                                                          QtWidgets.QMessageBox.Ok)
 
         elif 'InvalidMoveChannel' in error:
-            self.choice = QtWidgets.QMessageBox.question(self, "Invalid Move to Channel Value!",
-                                                         "The value you have chosen for the 'Move to Channel' value is "
+            self.choice = QtWidgets.QMessageBox.question(self, "Invalid Move to Cell Value!",
+                                                         "The value you have chosen for the 'Move to Cell' value is "
                                                          "invalid, please choose a valid value before continuing!",
                                                          QtWidgets.QMessageBox.Ok)
 
         elif 'SameChannelInvalid' in error:
             self.choice = QtWidgets.QMessageBox.question(self, "Same Channel Error!",
-                                                         "The value you have chosen for the 'Move to Channel' value is "
+                                                         "The value you have chosen for the 'Move to Cell' value is "
                                                          "the same as the cell you are cutting from! If you would like "
                                                          "to move these selected spikes to a different channel, please "
                                                          "choose another channel!",
                                                          QtWidgets.QMessageBox.Ok)
 
         elif 'ActionsMade' in error:
-            self.choice = QtWidgets.QMessageBox.question(self, "Are you sure............?",
+            self.choice = QtWidgets.QMessageBox.question(self, "Are you sure...?",
                                                          "You have performed some actions that will be lost when you"
                                                          " reload this cut file. Are you sure you want to continue?",
-                                                         QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.Yes)
+                                                         QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
 
         elif 'OverwriteCut' in error:
             cut_file = os.path.realpath(error.split('!')[1])
             self.choice = QtWidgets.QMessageBox.question(self, "Cut Filename Exists",
-                                                         "The following cut filename exists:\n\n%s\n\n Are you sure you " 
-                                                         "want to overwrite this file?" % cut_file,
+                                                         "The following cut filename exists:\n\n%s\n\n Are you sure you" 
+                                                         " want to overwrite this file?" % cut_file,
                                                          QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
 
         elif 'saveComplete' in error:
             self.choice = QtWidgets.QMessageBox.question(self, "Save Complete",
-                                                         "Your cut file has been saved successfully!",
+                                                         "Your '.cut' file has been saved successfully!",
+                                                         QtWidgets.QMessageBox.Ok)
+
+        elif 'saveCompleteClu' in error:
+            self.choice = QtWidgets.QMessageBox.question(self, "Save Complete",
+                                                         "Your '.clu' file has been saved successfully!",
                                                          QtWidgets.QMessageBox.Ok)
 
         elif 'invalidMaxSpikes' in error:
@@ -532,7 +540,6 @@ class MainWindow(QtWidgets.QWidget):
         self.reset_plots()
 
     def reset_plots(self):
-
         if hasattr(self, 'scatterItem'):
             if self.scatterItem is not None:
                 self.glViewWidget.removeItem(self.scatterItem)
@@ -577,7 +584,6 @@ class MainWindow(QtWidgets.QWidget):
                     time.sleep(0.1)
 
     def reload_cut(self):
-
         if self.actions_made is True:
             self.choice = None
             self.LogError.signal.emit('ActionsMade')
@@ -649,12 +655,6 @@ class MainWindow(QtWidgets.QWidget):
 
         # we will update the cut_filename
         self.set_cut_filename()
-
-    def cut_filename_changed(self):
-        """
-        This method will run when the cut filename LineEdit has been changed
-        """
-        cut_filename = self.cut_filename.text()
 
     def filename_changed(self):
         """
