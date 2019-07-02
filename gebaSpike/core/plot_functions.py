@@ -26,6 +26,9 @@ def replot_unit(self, index, cell=None):
     :return:
     """
 
+    if index is None:
+        return
+
     # get the cell for the color
     if cell is None:
         cell = get_cell_from_index(self, index)
@@ -684,7 +687,7 @@ def mouse_click_event(self, index, ev=None):
                     for plotted_cell in self.cell_subsample_i.keys():
                         plotted_channel_index = get_index_from_cell(self, plotted_cell)
 
-                        if any(plotted_cell == cell_value for cell_value in [0, invalid_cell_number, cell]):
+                        if any(plotted_cell == cell_value for cell_value in [0, invalid_cell_number]):
                             # skip the invalid channel (done later) and the dummy channel (not plotted)
                             continue
 
@@ -699,84 +702,86 @@ def mouse_click_event(self, index, ev=None):
                     max_spikes_changed = True
 
             reconfigure = False
-            # remove these spikes from all the channels
-            for data_chan in np.arange(self.n_channels):
-                if invalid_index is not None:
-                    # get the invalid data
-                    invalid_cell_data = self.unit_data[index][data_chan][crossed_cells, :]
-                    # update the invalid_data channel with this current data
-                    self.unit_data[invalid_index][data_chan] = np.vstack((self.unit_data[invalid_index][data_chan],
-                                                                          invalid_cell_data))
 
-                    # update the plotted subsample as well
-                    _, subsample_i = findSpikeSubsample(self.unit_data[invalid_index][data_chan], self.max_spike_plots)
-                    if invalid_cell_number not in self.cell_subsample_i.keys():
-                        self.cell_subsample_i[invalid_cell_number] = {data_chan: subsample_i}
+            if len(crossed_cells) != 0:
+                # remove these spikes from all the channels
+                for data_chan in np.arange(self.n_channels):
+                    if invalid_index is not None:
+                        # get the invalid data
+                        invalid_cell_data = self.unit_data[index][data_chan][crossed_cells, :]
+                        # update the invalid_data channel with this current data
+                        self.unit_data[invalid_index][data_chan] = np.vstack((self.unit_data[invalid_index][data_chan],
+                                                                              invalid_cell_data))
+
+                        # update the plotted subsample as well
+                        _, subsample_i = findSpikeSubsample(self.unit_data[invalid_index][data_chan], self.max_spike_plots)
+                        if invalid_cell_number not in self.cell_subsample_i.keys():
+                            self.cell_subsample_i[invalid_cell_number] = {data_chan: subsample_i}
+                        else:
+                            self.cell_subsample_i[invalid_cell_number][data_chan] = subsample_i
                     else:
-                        self.cell_subsample_i[invalid_cell_number][data_chan] = subsample_i
-                else:
-                    reconfigure = True
-
-                # delete the invalid data from the selected channel
-                self.unit_data[index][data_chan] = np.delete(self.unit_data[index][data_chan], crossed_cells, axis=0)
-
-                # recalculate subplot for the channel that the spikes were removed from
-                if len(self.unit_data[index][data_chan]) > 0:
-                    _, subsample_i = findSpikeSubsample(self.unit_data[index][data_chan], self.max_spike_plots)
-                    if cell not in self.cell_subsample_i.keys():
-                        self.cell_subsample_i[cell] = {data_chan: subsample_i}
-                    else:
-                        self.cell_subsample_i[cell][data_chan] = subsample_i
-                else:
-                    # there is no data left, don't need to worry about the subsampling anymore
-                    if cell in self.cell_subsample_i.keys():
-                        self.cell_subsample_i.pop(cell)
                         reconfigure = True
 
-            # check if the cell still exists
-            for key, value in self.unit_data[index].items():
-                if len(value) == 0:
-                    if index != -1:
-                        # avoid popping the dummy cell (index -1)
-                        self.unit_data.pop(index)
-                        reconfigure = True
-                        break
+                    # delete the invalid data from the selected channel
+                    self.unit_data[index][data_chan] = np.delete(self.unit_data[index][data_chan], crossed_cells, axis=0)
 
-            # update the bool
-            cell_indices = self.cell_indices[cell]
-            # append invalid cells to the new cell number
-            invalid_cells = cell_indices[crossed_cells]
-            self.cell_indices[cell] = np.delete(cell_indices, crossed_cells)
+                    # recalculate subplot for the channel that the spikes were removed from
+                    if len(self.unit_data[index][data_chan]) > 0:
+                        _, subsample_i = findSpikeSubsample(self.unit_data[index][data_chan], self.max_spike_plots)
+                        if cell not in self.cell_subsample_i.keys():
+                            self.cell_subsample_i[cell] = {data_chan: subsample_i}
+                        else:
+                            self.cell_subsample_i[cell][data_chan] = subsample_i
+                    else:
+                        # there is no data left, don't need to worry about the subsampling anymore
+                        if cell in self.cell_subsample_i.keys():
+                            self.cell_subsample_i.pop(cell)
+                            reconfigure = True
 
-            # check if there are still indices for this cell, if empty we will remove
-            if len(self.cell_indices[cell]) == 0:
-                clear_unit(self, cell)  # delete the cell's plots
-                if cell in self.original_cell_count.keys():
-                    self.original_cell_count.pop(cell)
-                reconfigure = True
+                # check if the cell still exists
+                for key, value in self.unit_data[index].items():
+                    if len(value) == 0:
+                        if index != -1:
+                            # avoid popping the dummy cell (index -1)
+                            self.unit_data.pop(index)
+                            reconfigure = True
+                            break
 
-                if cell != 0:
-                    self.cell_indices.pop(cell)
+                # update the bool
+                cell_indices = self.cell_indices[cell]
+                # append invalid cells to the new cell number
+                invalid_cells = cell_indices[crossed_cells]
+                self.cell_indices[cell] = np.delete(cell_indices, crossed_cells)
 
-            if invalid_cell_number in self.cell_indices.keys():
-                # the cell has existed already within the main window, we can just add to this plot
-                self.cell_indices[invalid_cell_number] = np.concatenate((self.cell_indices[invalid_cell_number],
-                                                                         invalid_cells))
-            else:
-                # this cell is not already plotted, have to add the plot and possibly reconfigure
-                self.cell_indices[invalid_cell_number] = invalid_cells
-
-                if invalid_cell_number != 0:
+                # check if there are still indices for this cell, if empty we will remove
+                if len(self.cell_indices[cell]) == 0:
+                    clear_unit(self, cell)  # delete the cell's plots
+                    if cell in self.original_cell_count.keys():
+                        self.original_cell_count.pop(cell)
                     reconfigure = True
 
-            # add the latest action
-            if len(self.latest_actions) == 0 or max_num_actions == 1:
-                self.latest_actions = {0: {'action': 'cut', 'fromCell': cell, 'toCell': invalid_cell_number,
-                                           'movedCutIndices': invalid_cells}}
-            else:
-                next_action = get_next_action(self)
-                self.latest_actions[next_action] = {'action': 'cut', 'fromCell': cell, 'toCell': invalid_cell_number,
-                                                    'movedCutIndices': invalid_cells}
+                    if cell != 0:
+                        self.cell_indices.pop(cell)
+
+                if invalid_cell_number in self.cell_indices.keys():
+                    # the cell has existed already within the main window, we can just add to this plot
+                    self.cell_indices[invalid_cell_number] = np.concatenate((self.cell_indices[invalid_cell_number],
+                                                                             invalid_cells))
+                else:
+                    # this cell is not already plotted, have to add the plot and possibly reconfigure
+                    self.cell_indices[invalid_cell_number] = invalid_cells
+
+                    if invalid_cell_number != 0:
+                        reconfigure = True
+
+                # add the latest action
+                if len(self.latest_actions) == 0 or max_num_actions == 1:
+                    self.latest_actions = {0: {'action': 'cut', 'fromCell': cell, 'toCell': invalid_cell_number,
+                                               'movedCutIndices': invalid_cells}}
+                else:
+                    next_action = get_next_action(self)
+                    self.latest_actions[next_action] = {'action': 'cut', 'fromCell': cell, 'toCell': invalid_cell_number,
+                                                        'movedCutIndices': invalid_cells}
 
             if not reconfigure:
                 # update plots for the invalid cell and the cell you removed these spikes from

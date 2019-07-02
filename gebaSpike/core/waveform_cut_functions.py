@@ -111,7 +111,7 @@ def findSpikeSubsample(data, max_n):
         data_bool[np.where((data >= ymax) | (data <= ymin))] = 1
         data_boolsum = np.sum(data_bool, axis=1)
         clipped_cell_i = np.where(data_boolsum >= 5)[0]
-        non_clipped_cell_i = np.setdiff1d(np.arange(data.shape[0] - 1), clipped_cell_i.flatten)
+        non_clipped_cell_i = np.setdiff1d(np.arange(data.shape[0]), clipped_cell_i.flatten)
 
         # find the outlying points
         data_i = np.unique(np.concatenate((np.argmax(data[non_clipped_cell_i, :], axis=0),

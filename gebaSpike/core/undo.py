@@ -45,6 +45,7 @@ def undo_function(self):
 
                 # update the plotted subsample as well
                 _, subsample_i = findSpikeSubsample(self.unit_data[fromCellIndex][data_chan], self.max_spike_plots)
+
                 if fromCell not in self.cell_subsample_i.keys():
                     self.cell_subsample_i[fromCell] = {data_chan: subsample_i}
                 else:
@@ -92,7 +93,6 @@ def undo_function(self):
 
         # add the spikes back to where they used to be
         # determine if we need to reconfigure the main window
-
         if fromCell in self.cell_indices.keys():
             # the cell has existed already within the main window, we can just add to this plot
             self.cell_indices[fromCell] = np.concatenate((self.cell_indices[fromCell], undo_cells))
@@ -111,7 +111,6 @@ def undo_function(self):
             replot_unit(self, fromCellIndex)
         else:
             # we will need to reconfigure the main window possibly, do so
-
             if fromCellIndex in self.unit_plots.keys():
                 replot_unit(self, fromCellIndex)
             unique_cells = np.asarray(list(self.cell_indices.keys()))
