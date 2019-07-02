@@ -41,7 +41,10 @@ def replot_unit(self, index, cell=None):
             self.unit_plots[index][0].removeItem(self.avg_plot_lines[index][channel])
 
         plot_data = self.unit_data[index][channel]
+
         current_n = plot_data.shape[0]
+
+        plot_data = plot_data[self.cell_subsample_i[cell][channel], :]
 
         self.plot_lines[index][channel] = MultiLine(
             np.tile(np.arange(self.samples_per_spike), (plot_data.shape[0], 1)),
@@ -140,8 +143,8 @@ def reconfigure_units(self, unique_cells):
         old_vb[index] = value
     self.vb = {}
 
+    max_spike_plots = get_max_spikes(self)
     if self.max_spike_plots is None:
-        max_spike_plots = get_max_spikes(self)
         if max_spike_plots is None:
             return
         else:
@@ -208,10 +211,6 @@ def reconfigure_units(self, unique_cells):
             if cell in old_plotted_units:
                 # figure out if we have plotted this cell before, if so, we can move that data instead of re-plotting
 
-                # if index < len(old_indices):
-                # if the index is less than the length of the old indices, then
-
-                # old_index = old_indices[index]
                 old_index = get_index_from_old_cell(cell, old_unit_plots)
 
                 current_n = len(self.cell_indices[cell])
@@ -254,7 +253,7 @@ def reconfigure_units(self, unique_cells):
                     cell_data = self.tetrode_data[:, cell_bool, :]
 
                     plot_data = cell_data[channel]
-                    # channel_max = np.amax(plot_data)
+
                     channel_max = 127
                     plot_data = plot_data - channel * channel_range - channel_max
 
@@ -672,12 +671,32 @@ def mouse_click_event(self, index, ev=None):
             # append the crossed lines to the invalid cell's plot
             invalid_index = get_index_from_cell(self, invalid_cell_number)
 
+            max_spikes_changed = False
+            # self.max_spike_plots will be none if the value has been changed recently
             if self.max_spike_plots is None:
                 max_spike_plots = get_max_spikes(self)
                 if max_spike_plots is None:
                     return
                 else:
                     self.max_spike_plots = max_spike_plots
+
+                    # update the max spikes by re-calculating the subsample index values
+                    for plotted_cell in self.cell_subsample_i.keys():
+                        plotted_channel_index = get_index_from_cell(self, plotted_cell)
+
+                        if any(plotted_cell == cell_value for cell_value in [0, invalid_cell_number, cell]):
+                            # skip the invalid channel (done later) and the dummy channel (not plotted)
+                            continue
+
+                        for data_chan in np.arange(self.n_channels):
+                            _, subsample_i = findSpikeSubsample(self.unit_data[plotted_channel_index][data_chan],
+                                                                self.max_spike_plots)
+
+                            if plotted_cell not in self.cell_subsample_i.keys():
+                                self.cell_subsample_i[plotted_cell] = {data_chan: subsample_i}
+                            else:
+                                self.cell_subsample_i[plotted_cell][data_chan] = subsample_i
+                    max_spikes_changed = True
 
             reconfigure = False
             # remove these spikes from all the channels
@@ -774,6 +793,14 @@ def mouse_click_event(self, index, ev=None):
 
                 unique_cells = np.asarray(list(self.cell_indices.keys()))
                 reconfigure_units(self, list(unique_cells[unique_cells != 0]))
+
+            if max_spikes_changed:
+                for plotted_cell in self.cell_indices.keys():
+                    if plotted_cell == invalid_cell_number or plotted_cell == cell:
+                        continue
+
+                    plotted_cell_index = get_index_from_cell(self, plotted_cell)
+                    replot_unit(self, plotted_cell_index)
 
             if index in self.unit_drag_lines:
                 self.unit_drag_lines[index].hide()

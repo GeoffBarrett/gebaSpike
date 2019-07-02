@@ -241,14 +241,13 @@ def validateMaxSpikes(max_spikes):
 
 
 def get_max_spikes(self):
-
     max_spike_plots = self.max_spike_plots_text.text()
     max_spike_valid = validateMaxSpikes(max_spike_plots)
     if max_spike_valid:
         max_spike_plots = int(max_spike_plots)
     else:
         self.choice = None
-        self.LogError.signal.emit('saveComplete')
+        self.LogError.signal.emit('invalidMaxSpikes')
         while self.choice is None:
             time.sleep(0.1)
         return None
@@ -299,5 +298,4 @@ def maxSpikesChange(self, origin):
     elif origin == 'popup':
         cell = self.cell
         self.mainWindow.max_spike_plots_text.setText(self.max_spike_plots_text.text())
-
     self.max_spike_plots = None  # we will set this value to none as to re-validate the value

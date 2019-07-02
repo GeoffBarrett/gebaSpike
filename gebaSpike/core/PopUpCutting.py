@@ -75,10 +75,15 @@ class PopUpCutWindow(QtWidgets.QWidget):
                                                          QtWidgets.QMessageBox.Ok)
 
         elif 'ActionsMade' in error:
-            self.choice = QtWidgets.QMessageBox.question(self, "Are you sure............?",
+            self.choice = QtWidgets.QMessageBox.question(self, "Are you sure...?",
                                                          "You have performed some actions that will be lost when you"
                                                          " reload this cut file. Are you sure you want to continue?",
-                                                         QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.Yes)
+                                                         QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+
+        elif 'invalidMaxSpikes' in error:
+            self.choice = QtWidgets.QMessageBox.question(self, "Invalid Max Spikes",
+                                                         "The number chosen for Max Spikes is invalid!",
+                                                         QtWidgets.QMessageBox.Ok)
 
     def initialize(self):
 
@@ -421,12 +426,31 @@ def mouse_click_eventPopup(self, vb, ev=None):
                 points = np.rint(np.asarray(self.channel_drag_lines.getState()['points']))
                 channel = int(self.channel_number.currentText()) - 1
 
+            max_spikes_changed = False
             if self.mainWindow.max_spike_plots is None:
                 max_spike_plots = get_max_spikes(self.mainWindow)
                 if max_spike_plots is None:
                     return
                 else:
                     self.mainWindow.max_spike_plots = max_spike_plots
+
+                    # update the max spikes by re-calculating the subsample index values
+                    for plotted_cell in self.mainWindow.cell_subsample_i.keys():
+                        plotted_channel_index = get_index_from_cell(self.mainWindow, plotted_cell)
+
+                        if any(plotted_cell == cell_value for cell_value in [0, invalid_cell_number, self.cell]):
+                            # skip the invalid channel (done later) and the dummy channel (not plotted)
+                            continue
+
+                        for data_chan in np.arange(self.mainWindow.n_channels):
+                            _, subsample_i = findSpikeSubsample(self.mainWindow.unit_data[plotted_channel_index][data_chan],
+                                                                self.mainWindow.max_spike_plots)
+
+                            if plotted_cell not in self.mainWindow.cell_subsample_i.keys():
+                                self.mainWindow.cell_subsample_i[plotted_cell] = {data_chan: subsample_i}
+                            else:
+                                self.mainWindow.cell_subsample_i[plotted_cell][data_chan] = subsample_i
+                    max_spikes_changed = True
 
             unit_data = self.mainWindow.unit_data[self.index][channel]
             crossed_cells = find_spikes_crossed(points, unit_data, samples_per_spike=self.samples_per_spike)
@@ -533,6 +557,15 @@ def mouse_click_eventPopup(self, vb, ev=None):
                     replot_unit(self.mainWindow, self.index)
                 unique_cells = np.asarray(list(self.mainWindow.cell_indices.keys()))
                 reconfigure_units(self.mainWindow, list(unique_cells[unique_cells != 0]))
+
+            if max_spikes_changed:
+                for plotted_cell in self.mainWindow.cell_indices.keys():
+                    if plotted_cell == invalid_cell_number or plotted_cell == self.cell:
+                        continue
+
+                    plotted_cell_index = get_index_from_cell(self.mainWindow, plotted_cell)
+                    replot_unit(self.mainWindow, plotted_cell_index)
+
 
             self.drag_active = False
             self.mainWindow.actions_made = True

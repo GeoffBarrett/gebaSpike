@@ -279,10 +279,10 @@ class MainWindow(QtWidgets.QWidget):
         button_layout = QtWidgets.QHBoxLayout()
 
         self.plot_btn = QtWidgets.QPushButton("Plot")
-        self.plot_btn.clicked.connect(lambda: plot_session(self))
+        self.plot_btn.clicked.connect(self.plotFunc)
 
-        self.reload_cut_btn = QtWidgets.QPushButton("Reload Cut/Clu")
-        self.reload_cut_btn.clicked.connect(self.reload_cut)
+        # self.reload_cut_btn = QtWidgets.QPushButton("Reload Cut/Clu")
+        # self.reload_cut_btn.clicked.connect(self.reload_cut)
 
         self.save_btn = QtWidgets.QPushButton("Save Cut")
         self.save_btn.clicked.connect(self.save_function)
@@ -297,7 +297,11 @@ class MainWindow(QtWidgets.QWidget):
         self.quit_btn.setShortcut("Ctrl+Q")  # creates shortcut for the quit button
         self.quit_btn.setToolTip('Click to quit gebaSpike!')
 
-        button_order = [self.plot_btn, self.save_btn, self.undo_btn, self.reload_cut_btn, self.quit_btn]
+        button_order = [self.plot_btn,
+                        self.save_btn,
+                        self.undo_btn,
+                        # self.reload_cut_btn,
+                        self.quit_btn]
 
         for btn in button_order:
             button_layout.addWidget(btn)
@@ -583,17 +587,18 @@ class MainWindow(QtWidgets.QWidget):
                 while self.choice is None:
                     time.sleep(0.1)
 
-    def reload_cut(self):
+    def plotFunc(self):
         if self.actions_made is True:
             self.choice = None
             self.LogError.signal.emit('ActionsMade')
             while self.choice is None:
                 time.sleep(0.1)
 
-        if self.choice == QtWidgets.QMessageBox.Yes:
-            self.reset_plots()
-            self.reset_parameters()
-
+            if self.choice == QtWidgets.QMessageBox.Yes:
+                self.reset_plots()
+                self.reset_parameters()
+                plot_session(self)
+        else:
             plot_session(self)
 
     def choose_filename(self):
