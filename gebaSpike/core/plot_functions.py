@@ -687,7 +687,7 @@ def mouse_click_event(self, index, ev=None):
                     for plotted_cell in self.cell_subsample_i.keys():
                         plotted_channel_index = get_index_from_cell(self, plotted_cell)
 
-                        if any(plotted_cell == cell_value for cell_value in [0, invalid_cell_number]):
+                        if any(plotted_cell == cell_value for cell_value in [0]):
                             # skip the invalid channel (done later) and the dummy channel (not plotted)
                             continue
 
