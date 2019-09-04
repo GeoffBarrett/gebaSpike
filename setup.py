@@ -10,7 +10,7 @@ pkg_name = "gebaSpike"
 
 setuptools.setup(
     name=pkg_name,
-    version="1.0.9",
+    version="1.0.10",
     author="Geoffrey Barrett",
     author_email="geoffrey.m.barrett@gmail.com",
     description="gebaSpike - GUI designed to improve manual spike sorting of in-vivo electrophysiology data.",

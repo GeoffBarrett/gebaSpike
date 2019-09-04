@@ -30,6 +30,7 @@ class MainWindow(QtWidgets.QWidget):
         self.setWindowTitle("%s - Main Window" % project_name)  # sets the main window title
 
         # initializing attributes
+        self.plotted_tetrode = None
         self.change_set_with_tetrode = True
         self.multiple_files = False
         self.cut_filename = None
@@ -324,7 +325,7 @@ class MainWindow(QtWidgets.QWidget):
 
         # ------------------------------------ version information -------------------------------------------------
 
-        vers_label = QtWidgets.QLabel("gebaSpike V1.0.9")
+        vers_label = QtWidgets.QLabel("gebaSpike V1.0.10")
 
         # --------- Create the Buttons at the bottom of the Main Window ------------- #
 
@@ -448,7 +449,8 @@ class MainWindow(QtWidgets.QWidget):
             self.LogError.signal.emit('saveCompleteClu')
             while self.choice is None:
                 time.sleep(0.1)
-            return
+            self.actions_made = False
+
         else:
             # save the cut filename
             write_cut(save_filename, cut_values)
@@ -456,7 +458,7 @@ class MainWindow(QtWidgets.QWidget):
             self.LogError.signal.emit('saveComplete')
             while self.choice is None:
                 time.sleep(0.1)
-            return
+            self.actions_made = False
 
     def close_app(self):
         """This method will prompt the user, asking if they would like to quit or not"""
@@ -557,8 +559,8 @@ class MainWindow(QtWidgets.QWidget):
                                                          QtWidgets.QMessageBox.Ok)
 
         elif 'ActionsMade' in error:
-            self.choice = QtWidgets.QMessageBox.question(self, "Are you sure...?",
-                                                         "You have performed some actions that will be lost when you"
+            self.choice = QtWidgets.QMessageBox.question(self, "Are you sure?",
+                                                         "Any unsaved actions will be lost when you"
                                                          " reload this cut file. Are you sure you want to continue?",
                                                          QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
 
@@ -611,6 +613,7 @@ class MainWindow(QtWidgets.QWidget):
         This method will reset the parameters, generally used when switching sessions so we can start fresh.
         :return:
         """
+        self.plotted_tetrode = None
         self.feature_data = None
         self.tetrode_data = None
         self.tetrode_data_loaded = False
@@ -696,9 +699,6 @@ class MainWindow(QtWidgets.QWidget):
 
         self.cut_filename.setText(os.path.realpath(current_filename))
 
-        # change the tetrode value
-        # self.change_set_with_tetrode = False
-
     def plotFunc(self):
         """
         This method will be called when the Plot button is pressed.
@@ -720,20 +720,30 @@ class MainWindow(QtWidgets.QWidget):
         if self.actions_made is True:
             # there were actions made, raise the error so the user can decide to continue or not
 
-            self.choice = None
-            self.LogError.signal.emit('ActionsMade')
-            while self.choice is None:
-                time.sleep(0.1)
+            # we don't want this to pop-up whenever switch tetrodes, so check if the plotted data is from the
+            # current chosen tetrode
+            if self.tetrode_cb.currentText() == self.plotted_tetrode:
+                self.choice = None
+                self.LogError.signal.emit('ActionsMade')
+                while self.choice is None:
+                    time.sleep(0.1)
 
-            # check which option the user chose
-            if self.choice == QtWidgets.QMessageBox.Yes:
-                # user chose the re-plot anyways
+                # check which option the user chose
+                if self.choice == QtWidgets.QMessageBox.Yes:
+                    # user chose the re-plot anyways
+                    self.reset_plots()
+                    self.reset_parameters()
+                    plot_session(self)
+            else:
+                # the tetrodes are different, just plot the session
                 self.reset_plots()
                 self.reset_parameters()
                 plot_session(self)
         else:
             # there were no actions made, simply plot the session
             plot_session(self)
+
+        self.plotted_tetrode = self.tetrode_cb.currentText()
 
     def choose_filename(self):
         """
@@ -840,6 +850,7 @@ class MainWindow(QtWidgets.QWidget):
         # we will update the cut_filename
         if self.change_set_with_tetrode:
             self.set_cut_filename()
+            # self.reset_parameters()
 
     def filename_changed(self):
         """
