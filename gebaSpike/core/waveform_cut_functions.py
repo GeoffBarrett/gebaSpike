@@ -1,5 +1,6 @@
 import numpy as np
 import time
+# from .plot_functions import mouse_click_event
 
 
 def get_grid_dimensions(n_cells, method='auto', n=None):

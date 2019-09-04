@@ -2,17 +2,16 @@ import sys
 import pyqtgraph as pg
 from PyQt5 import QtCore, QtGui, QtWidgets
 from pyqtgraph.widgets.MatplotlibWidget import MatplotlibWidget
-from core.gui_utils import validate_session, Communicate, validate_cut
+from core.gui_utils import validate_session, Communicate, validate_cut, find_tetrodes
 from core.default_parameters import project_name, default_filename, defaultXAxis, defaultYAxis, defaultZAxis, openGL, \
-    default_move_channel, max_spike_plots
-from core.Tint_Matlab import find_tetrodes
-from core.plot_functions import plot_session
+    default_move_channel, max_spike_plots, alt_action_button
+# from core.Tint_Matlab import find_tetrodes
+from core.plot_functions import plot_session, cut_cell, get_index_from_roi
 from core.waveform_cut_functions import moveToChannel, maxSpikesChange
 from core.undo import undo_function
 from core.feature_plot import feature_name_map
 from core.PopUpCutting import PopUpCutWindow
 from core.writeCut import write_cut, write_clu
-# from core.plot_functions import get_index_from_cell
 import pyqtgraph.opengl as gl
 import os
 import json
@@ -23,11 +22,16 @@ import numpy as np
 class MainWindow(QtWidgets.QWidget):
 
     def __init__(self):
+        """
+        initializes many of the variables
+        """
         super(MainWindow, self).__init__()
 
         self.setWindowTitle("%s - Main Window" % project_name)  # sets the main window title
 
         # initializing attributes
+        self.change_set_with_tetrode = True
+        self.multiple_files = False
         self.cut_filename = None
         self.choose_cut_filename_btn = None
         self.feature_win = None
@@ -38,21 +42,27 @@ class MainWindow(QtWidgets.QWidget):
         self.y_axis_cb = None
         self.z_axis_cb = None
         self.tetrode_cb = None
-        self.choice = None
+        self.choice = None  # the current choice for the error popups
         self.plot_btn = None
         self.feature_plot = None
 
+        # initialize list of actions to undo
         self.latest_actions = {}
 
+        # bool for if an action has been made, I suppose we could take the length of the actions attribute
         self.actions_made = False
 
+        # bool representing if the user is dragging the mouse (for drawing the line segments on the graphs)
         self.drag_active = False
 
+        # the graph index that was last dragged upon with the mouse
         self.last_drag_index = None
 
         self.feature_data = None
         self.tetrode_data = None
+        self.tetrode_data_loaded = False
         self.cut_data = None
+        self.cut_data_loaded = False
         self.cut_data_original = None
         self.spike_times = None
         self.scatterItem = None
@@ -60,8 +70,12 @@ class MainWindow(QtWidgets.QWidget):
         self.feature_plot_added = False
         self.samples_per_spike = None
 
+        # keep a list of the positions that the cells are plotted in
         self.unit_positions = {}
+
+        # not all the spikes are plotted at once, so we will keep a dict of which subsample is plotted
         self.cell_subsample_i = {}
+
         self.unit_drag_lines = {}
         self.active_ROI = []
         self.unit_data = {}
@@ -121,12 +135,47 @@ class MainWindow(QtWidgets.QWidget):
         pg.setConfigOptions(antialias=True)
 
         self.PopUpCutWindow = {}
-        # self.PopUpCutWindow = PopUpCutWindow(self)
 
         QtWidgets.QApplication.setStyle(QtWidgets.QStyleFactory.create('GTK+'))
 
         self.setWindowIcon(QtGui.QIcon(os.path.join(self.IMG_DIR, 'GEBA_Logo.png')))  # declaring the icon image
         self.initialize()  # initializes the main window
+
+    def keyPressEvent(self, event):
+        """
+        This method will occur when the main window is on top and the user presses a button
+
+        :param event:
+        :return:
+        """
+        if type(event) == QtGui.QKeyEvent:
+            # here accept the event and do something
+            if event.key() == alt_action_button:
+                # check if there is a popup that is shown
+                if len(self.PopUpCutWindow) > 0:
+                    pass
+
+                if len(self.active_ROI) == 1:
+                    # get the index
+                    index = get_index_from_roi(self, self.active_ROI[0])
+                    cut_cell(self, index)
+                elif len(self.active_ROI) > 1:
+                    # there shouldn't be more than 1 ROI open
+                    self.active_ROI = self.active_ROI[-1]
+                    index = get_index_from_roi(self, self.active_ROI[0])
+                    # this shouldn't happen, lets remove all the ROI's
+                    cut_cell(self, index)
+
+            event.accept()
+        else:
+            event.ignore()
+
+    def isPopup(self):
+        """
+        This function is is for the cutting functionality as it will tell the cut function that it is not a popup
+        window, and thus to treat it as such.
+        """
+        return False
 
     def initialize(self):
         """
@@ -264,7 +313,6 @@ class MainWindow(QtWidgets.QWidget):
 
             feature_win_layout.addWidget(self.glViewWidget)
         else:
-            # self.feature_win = PltWidget(self)
             self.feature_win = MatplotlibWidget()
             self.feature_win.toolbar.hide()  # hide the toolbar
 
@@ -274,15 +322,16 @@ class MainWindow(QtWidgets.QWidget):
         for _object in [self.feature_win, self.unit_win]:
             plot_layout.addWidget(_object)
 
+        # ------------------------------------ version information -------------------------------------------------
+
+        vers_label = QtWidgets.QLabel("gebaSpike V1.0.9")
+
         # --------- Create the Buttons at the bottom of the Main Window ------------- #
 
         button_layout = QtWidgets.QHBoxLayout()
 
         self.plot_btn = QtWidgets.QPushButton("Plot")
         self.plot_btn.clicked.connect(self.plotFunc)
-
-        # self.reload_cut_btn = QtWidgets.QPushButton("Reload Cut/Clu")
-        # self.reload_cut_btn.clicked.connect(self.reload_cut)
 
         self.save_btn = QtWidgets.QPushButton("Save Cut")
         self.save_btn.clicked.connect(self.save_function)
@@ -300,7 +349,6 @@ class MainWindow(QtWidgets.QWidget):
         button_order = [self.plot_btn,
                         self.save_btn,
                         self.undo_btn,
-                        # self.reload_cut_btn,
                         self.quit_btn]
 
         for btn in button_order:
@@ -308,18 +356,25 @@ class MainWindow(QtWidgets.QWidget):
 
         main_window_layout = QtWidgets.QVBoxLayout()
 
-        layout_order = [filename_grid_layout, spike_parameter_layout, plot_layout, button_layout]
-        add_Stretch = [False, False, False, False]
+        layout_order = [filename_grid_layout, spike_parameter_layout, plot_layout, button_layout, vers_label]
+        # do you want to add stretch to the widgets/layouts within the layout order?
+        add_Stretch = [False, False, False, False, False]
+        # do you want to center the widgets/layouts within the layout order?
+        align_center = [True, True, True, True, False]
+
         # ---------------- add all the layouts and widgets to the Main Window's layout ------------ #
 
         # main_window_layout.addStretch(1)  # adds the widgets/layouts according to the order
-        for widget, addStretch in zip(layout_order, add_Stretch):
+        for widget, addStretch, alignCenter in zip(layout_order, add_Stretch, align_center):
             if 'Layout' in widget.__str__():
                 main_window_layout.addLayout(widget)
                 if addStretch:
                     main_window_layout.addStretch(1)
             else:
-                main_window_layout.addWidget(widget, 0, QtCore.Qt.AlignCenter)
+                if alignCenter:
+                    main_window_layout.addWidget(widget, 0, QtCore.Qt.AlignCenter)
+                else:
+                    main_window_layout.addWidget(widget, 0)
                 if addStretch:
                     main_window_layout.addStretch(1)
 
@@ -328,10 +383,21 @@ class MainWindow(QtWidgets.QWidget):
         self.show()  # shows the window
 
     def addPopup(self, cell):
+        """
+        This method will modify the self.PopUpCutWindow, so that we keep track of which popup window belongs to which
+        cell
+
+        :param cell:
+        :return:
+        """
         self.PopUpCutWindow[cell] = PopUpCutWindow(self)
 
     def save_function(self):
+        """
+        this method will save the .cut file
 
+        :return:
+        """
         if self.cut_filename.text() == default_filename:
             return
 
@@ -397,8 +463,8 @@ class MainWindow(QtWidgets.QWidget):
         # pop up window that asks if you really want to exit the app ------------------------------------------------
 
         choice = QtWidgets.QMessageBox.question(self, "Quitting ",
-                                            "Do you really want to exit?",
-                                            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+                                                "Do you really want to exit?",
+                                                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
 
         if choice == QtWidgets.QMessageBox.Yes:
             sys.exit()  # tells the app to quit
@@ -406,13 +472,29 @@ class MainWindow(QtWidgets.QWidget):
             pass
 
     def raiseError(self, error):
+        """
+        This method will be called whenever an error has occurred, and will generally raise Message Box that the user
+        will interact with.
+
+        :param error:
+        :return:
+        """
         if 'TetrodeExistError' in error:
             filename = error.split('!')[1]
             self.choice = QtWidgets.QMessageBox.question(self, "Tetrode Filename Does Not Exist!",
                                                          "The following tetrode filename does not exist: \n%s\nPlease" %
                                                          filename +
                                                          " ensure that the file exists before attempting to plot the"
-                                                         " data",
+                                                         " data!",
+                                                         QtWidgets.QMessageBox.Ok)
+
+        if 'CutExistError' in error:
+            filename = error.split('!')[1]
+            self.choice = QtWidgets.QMessageBox.question(self, "Cut/Clu File Exist ERror!",
+                                                         "The following .cut/.clu filename does not exist: \n%s\nPlease" %
+                                                         filename +
+                                                         " ensure that the file exists before attempting to plot the"
+                                                         " data!",
                                                          QtWidgets.QMessageBox.Ok)
 
         elif 'InvalidSession' in error:
@@ -421,6 +503,18 @@ class MainWindow(QtWidgets.QWidget):
                                                          "The following session filename is invalid: \n%s\nPlease" %
                                                          session +
                                                          " ensure that the appropriate files exist for this session.",
+                                                         QtWidgets.QMessageBox.Ok)
+
+        elif 'InvalidMultiSession' in error:
+            cut_spikes = error.split('!')[1]
+            tetrode_spikes = error.split('!')[2]
+            self.choice = QtWidgets.QMessageBox.question(self, "Invalid Multi Sessions!",
+                                                         "You are choosing to combine multiple session files! The "
+                                                         "chosen .cut filename (with the current tetrode) has " + str(
+                                                         cut_spikes) + " spikes"
+                                                         " whereas the combined tetrode spikes for the chosen session "
+                                                         "files add up to " + tetrode_spikes + " spikes! Make sure you "
+                                                         "choose the correct .cut file for the chosen .set files!",
                                                          QtWidgets.QMessageBox.Ok)
 
         elif 'cutIndexError' in error:
@@ -491,6 +585,11 @@ class MainWindow(QtWidgets.QWidget):
                                                          QtWidgets.QMessageBox.Ok)
 
     def get_settings(self):
+        """
+        This methoid will read the settings filename and return any settings
+
+        :return:
+        """
         settings = {}
         if os.path.exists(self.settings_filename):
             with open(self.settings_filename, 'r') as f:
@@ -498,14 +597,25 @@ class MainWindow(QtWidgets.QWidget):
         return settings
 
     def overwrite_settings(self):
+        """
+        This method will overwrite the settings file with the current settings
+
+        :return:
+        """
         # overwrite settings file
         with open(self.settings_filename, 'w') as f:
             json.dump(self.settings, f, sort_keys=True, indent=4)
 
     def reset_parameters(self):
+        """
+        This method will reset the parameters, generally used when switching sessions so we can start fresh.
+        :return:
+        """
         self.feature_data = None
         self.tetrode_data = None
+        self.tetrode_data_loaded = False
         self.cut_data = None
+        self.cut_data_loaded = False
         self.cut_data_original = None
         self.n_channels = None
         self.spike_times = None
@@ -521,6 +631,9 @@ class MainWindow(QtWidgets.QWidget):
         self.cell_subsample_i = {}
         self.unit_positions = {}
         self.original_cell_count = {}
+
+        for popup in self.PopUpCutWindow.values():
+            popup.close()
 
         self.PopUpCutWindow = {}
 
@@ -544,6 +657,11 @@ class MainWindow(QtWidgets.QWidget):
         self.reset_plots()
 
     def reset_plots(self):
+        """
+        This method will clear the plots
+
+        :return:
+        """
         if hasattr(self, 'scatterItem'):
             if self.scatterItem is not None:
                 self.glViewWidget.removeItem(self.scatterItem)
@@ -559,10 +677,10 @@ class MainWindow(QtWidgets.QWidget):
             if os.path.exists(self.settings['file_directory']):
                 current_filename, filename_filter = QtWidgets.QFileDialog.getOpenFileName(
                     self, caption="Select a '.Cut/.Clu' file!", directory=self.settings['file_directory'],
-                    filter='Cut Files (*.cut, *.clu*)')
+                    filter='Cut Files (*.cut *.clu*)')
             else:
                 current_filename, filename_filter = QtWidgets.QFileDialog.getOpenFileName(
-                    self, caption="Select a '.Cut/.Clu' file!", directory='', filter='Cut Files (*.cut, *.clu*)')
+                    self, caption="Select a '.Cut/.Clu' file!", directory='', filter='Cut Files (*.cut *.clu*)')
 
         # if no file chosen, skip
         if current_filename == '':
@@ -574,92 +692,154 @@ class MainWindow(QtWidgets.QWidget):
 
         self.overwrite_settings()
 
-        cut_valid, error_raised = validate_cut(self, self.filename.text(), current_filename)
+        self.reset_parameters()
 
-        if cut_valid:
-            # replace the current .cut field in the choose .cut field with chosen filename
-            self.cut_filename.setText(current_filename)
+        self.cut_filename.setText(os.path.realpath(current_filename))
 
-        else:
-            if not error_raised:
-                self.choice = None
-                self.LogError.signal.emit('InvalidCut!%s' % current_filename)
-                while self.choice is None:
-                    time.sleep(0.1)
+        # change the tetrode value
+        # self.change_set_with_tetrode = False
 
     def plotFunc(self):
+        """
+        This method will be called when the Plot button is pressed.
+
+        :return:
+        """
+
+        # validate the cut filename
+        cut_valid, error_raised = validate_cut(self, self.filename.text(), self.cut_filename.text())
+
+        if not cut_valid:
+            self.choice = None
+            self.LogError.signal.emit('InvalidCut!%s' % self.cut_filename.text())
+            while self.choice is None:
+                time.sleep(0.1)
+            return
+
+        # check if there were any actions made, this is because the attributes will be reset
         if self.actions_made is True:
+            # there were actions made, raise the error so the user can decide to continue or not
+
             self.choice = None
             self.LogError.signal.emit('ActionsMade')
             while self.choice is None:
                 time.sleep(0.1)
 
+            # check which option the user chose
             if self.choice == QtWidgets.QMessageBox.Yes:
+                # user chose the re-plot anyways
                 self.reset_plots()
                 self.reset_parameters()
                 plot_session(self)
         else:
+            # there were no actions made, simply plot the session
             plot_session(self)
 
     def choose_filename(self):
         """
-        This method will allow you to choose a filename to analyze.
+        This method will allow you to choose a .set filename to analyze.
         :return:
         """
 
         if 'file_directory' not in self.settings.keys():
-            current_filename, filename_filter = QtWidgets.QFileDialog.getOpenFileName(
+            current_filename, filename_filter = QtWidgets.QFileDialog.getOpenFileNames(
                 self, caption="Select a '.Set' file!", directory='', filter='Set Files (*.set)')
 
         else:
             if os.path.exists(self.settings['file_directory']):
-                current_filename, filename_filter = QtWidgets.QFileDialog.getOpenFileName(
+                current_filename, filename_filter = QtWidgets.QFileDialog.getOpenFileNames(
                     self, caption="Select a '.Set' file!", directory=self.settings['file_directory'],
                     filter='Set Files (*.set)')
             else:
-                current_filename, filename_filter = QtWidgets.QFileDialog.getOpenFileName(
+                current_filename, filename_filter = QtWidgets.QFileDialog.getOpenFileNames(
                     self, caption="Select a '.Set' file!", directory='', filter='Set Files (*.set)')
 
         # if no file chosen, skip
-        if current_filename == '':
+        if len(current_filename) == 0:
             return
 
-        chosen_directory = os.path.dirname(current_filename)
+        if len(current_filename) == 1:
+            # then the user has selected only one
+            current_filename = current_filename[0]
 
-        self.settings['file_directory'] = chosen_directory
+            # check if the session is valid
+            session_valid = validate_session(self, current_filename)
 
-        self.overwrite_settings()
+            if session_valid:
+                self.multiple_files = False
 
-        session_valid, error_raised = validate_session(self, current_filename)
+                # updated the chosen directory settings value so we remember our latest chosen directory
+                chosen_directory = os.path.dirname(current_filename)
+                self.settings['file_directory'] = chosen_directory
+                self.overwrite_settings()
 
-        if session_valid:
-            # replace the current .set field in the choose .set field with chosen filename
-            self.filename.setText(os.path.realpath(current_filename))
+                # replace the current .set field in the choose .set field with chosen filename
+                self.filename.setText(os.path.realpath(current_filename))
 
-            self.reset_parameters()
+                self.reset_parameters()
 
-        else:
-            if not error_raised:
+            else:
+                # the session is not valid, raise the error message
                 self.choice = None
                 self.LogError.signal.emit('InvalidSession!%s' % current_filename)
                 while self.choice is None:
                     time.sleep(0.1)
+        elif len(current_filename) > 1:
+            # then we have selected multiple files
 
-    def set_cut_filename(self):
-        filename = self.filename.text()
+            # check if the session is valid
+            session_valid = validate_session(self, current_filename)
 
-        try:
-            tetrode = int(self.tetrode_cb.currentText())
-        except ValueError:
+            if session_valid:
+                self.multiple_files = True
+
+                # updated the chosen directory settings value so we remember our latest chosen directory
+                chosen_directory = os.path.dirname(current_filename[0])
+                self.settings['file_directory'] = chosen_directory
+                self.overwrite_settings()
+
+                # replace the current .set field in the choose .set field with chosen filename
+                self.filename.setText(os.path.realpath(', '.join(current_filename)))
+
+                self.reset_parameters()
+
+            else:
+                # the session is not valid, raise the error message
+                self.choice = None
+                self.LogError.signal.emit('InvalidSession!%s' % ', '.join(current_filename))
+                while self.choice is None:
+                    time.sleep(0.1)
+        else:
             return
 
-        cut_filename = '%s_%d.cut' % (os.path.splitext(filename)[0], tetrode)
-        self.cut_filename.setText(cut_filename)
+    def set_cut_filename(self):
+        """
+        When you choose a session filename, it will trigger this function which will automatically set the .cut
+        filename for the user.
+
+        :return:
+        """
+
+        if not self.multiple_files:
+            filename = self.filename.text()
+
+            try:
+                tetrode = int(self.tetrode_cb.currentText())
+            except ValueError:
+                return
+
+            cut_filename = '%s_%d.cut' % (os.path.splitext(filename)[0], tetrode)
+            self.cut_filename.setText(os.path.realpath(cut_filename))
 
     def tetrode_changed(self):
+        """
+        Upon changing of the tetrode drop-menu, the .cut file will also need to be changed (trigger that change)
 
+        :return:
+        """
         # we will update the cut_filename
-        self.set_cut_filename()
+        if self.change_set_with_tetrode:
+            self.set_cut_filename()
 
     def filename_changed(self):
         """
@@ -669,15 +849,45 @@ class MainWindow(QtWidgets.QWidget):
         """
 
         filename = self.filename.text()
-        if os.path.exists(filename):
-            self.tetrode_cb.clear()
 
-            tetrode_list = find_tetrodes(self.filename.text())
+        if self.multiple_files:
+            filename = filename.split(', ')
 
-            for file in tetrode_list:
-                tetrode = os.path.splitext(file)[-1][1:]
-                self.tetrode_cb.addItem(tetrode)
+        else:
+            filename = [filename]
 
+        # ensure that the files exist
+        for file in filename:
+            if not os.path.exists(file):
+                return
+
+        tetrodes = []
+
+        self.tetrode_cb.clear()
+
+        tetrode_list = find_tetrodes(self, self.filename.text())
+
+        # get the extension value (excluding the .) so we can create a list of tetrode integers
+
+        for file in tetrode_list:
+            tetrode = os.path.splitext(file)[-1][1:]
+            tetrodes.append(tetrode)
+
+        # make a list of added tetrodes
+        added_tetrodes = []
+        for tetrode in sorted(tetrodes):
+            # check if the tetrode value has been added already
+            if tetrode in added_tetrodes:
+                # continue if already added
+                continue
+
+            # add the item to the list containing the tetrode value
+            self.tetrode_cb.addItem(tetrode)
+
+            # add the tetrode value to the added_tetrodes list
+            added_tetrodes.append(tetrode)
+
+        # set the cut_filename
         self.set_cut_filename()
 
 

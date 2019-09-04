@@ -4,6 +4,7 @@ import numpy as np
 from .default_parameters import channel_range, max_num_actions
 from .gui_utils import validate_session
 from .Tint_Matlab import getspikes, read_cut, read_clu
+from .gui_utils import validate_multisessions
 from .plot_utils import CustomViewBox, get_channel_color, MultiLine
 from .feature_plot import load_features, plot_features
 from .waveform_cut_functions import findSpikeSubsample, get_index_from_cell, \
@@ -500,47 +501,91 @@ def plot_session(self):
     if session_valid:
         tetrode = self.tetrode_cb.currentText()
 
-        session_filepath = os.path.splitext(self.filename.text())[0]
+        if self.multiple_files:
+            session_filepaths = self.filename.text().split(', ')
+            session_filepaths = [os.path.splitext(file)[0] for file in session_filepaths]
 
-        tetrode_filename = '%s.%s' % (session_filepath, tetrode)
+            sessions_valid, cut_spikes, tetrode_spikes = validate_multisessions(session_filepaths,
+                                                                                self.cut_filename.text(), tetrode)
+            if not sessions_valid:
+                self.choice = None
+                self.LogError.signal.emit('InvalidMultiSession!%d!%d' % (cut_spikes, tetrode_spikes))
+                while self.choice is None:
+                    time.sleep(0.1)
+                return
 
-        if os.path.exists(tetrode_filename):
+        else:
+            session_filepaths = [os.path.splitext(self.filename.text())[0]]
 
-            if self.tetrode_data is None:
+        for session_filepath in session_filepaths:
+            # session_filepath = os.path.splitext(self.filename.text())[0]
+            tetrode_filename = '%s.%s' % (session_filepath, tetrode)
 
-                ts, ch1, ch2, ch3, ch4, spikeparams = getspikes(tetrode_filename)
-                self.tetrode_data = np.vstack((ch1, ch2, ch3, ch4)).reshape((4, -1, ch1.shape[1]))
-                if self.spike_times is None:
-                    self.spike_times = ts
+            if os.path.exists(tetrode_filename):
 
-                self.n_channels = self.tetrode_data.shape[0]
-                self.samples_per_spike = self.tetrode_data.shape[2]
+                if self.tetrode_data_loaded is False:
 
-            if self.cut_data is None:
-                filename = self.cut_filename.text()  # the data filename (could be .cut or .clu file)
+                    ts, ch1, ch2, ch3, ch4, spikeparams = getspikes(tetrode_filename)
+                    if self.tetrode_data is None:
+                        self.tetrode_data = np.vstack((ch1, ch2, ch3, ch4)).reshape((4, -1, ch1.shape[1]))
+                    else:
+                        self.tetrode_data = np.hstack((self.tetrode_data, np.vstack((ch1, ch2, ch3, ch4)).reshape((4, -1, ch1.shape[1]))))
+
+                    if self.spike_times is None:
+                        self.spike_times = ts
+                    else:
+                        self.spike_times = np.r_[self.spike_times, ts]
+
+                    self.n_channels = self.tetrode_data.shape[0]
+                    self.samples_per_spike = self.tetrode_data.shape[2]
+
+            else:
+                # filename does not exist
+                self.choice = None
+                self.LogError.signal.emit('TetrodeExistError!%s' % tetrode_filename)
+
+                while self.choice is None:
+                    time.sleep(0.1)
+
+                self.tetrode_data_loaded = False
+                self.tetrode_data = None
+                return
+
+        if self.cut_data_loaded is False:
+            filename = self.cut_filename.text()  # the data filename (could be .cut or .clu file)
+            if os.path.exists(filename):
                 if '.clu.' in filename:
                     cut_data = read_clu(filename)
                 else:
                     cut_data = read_cut(filename)
 
-                self.cut_data = cut_data
+                if self.cut_data is None:
+                    self.cut_data = cut_data
+
                 self.cut_data_original = self.cut_data.copy()  # keep a copy of the original to revert if we want.
+                self.cut_data_loaded = True
+            else:
+                self.choice = None
+                self.LogError.signal.emit('CutExistError!%s' % filename)
 
-            load_features(self)
+                while self.choice is None:
+                    time.sleep(0.1)
+                return
 
-            plot_features(self)
+        self.tetrode_data_loaded = True
 
-            plot_units(self)
+        load_features(self)
 
-        else:
-            # filename does not exist
-            self.choice = None
-            self.LogError.signal.emit('TetrodeExistError!%s' % tetrode_filename)
+        plot_features(self)
 
-            while self.choice is None:
-                time.sleep(0.1)
+        plot_units(self)
 
-        return
+
+def get_index_from_roi(self, roi_value):
+    for index, value in self.unit_drag_lines.items():
+        if value == roi_value:
+            return index
+    return None
 
 
 def drag(self, index, ev=None):
@@ -633,180 +678,234 @@ def mouse_click_event(self, index, ev=None):
     elif ev.button() == QtCore.Qt.MiddleButton:
         # then we will accept the changes
 
-        if self.unit_drag_lines[index] in self.active_ROI:
-            # then we have an active ROI
-            # we will get the x,y positions (rounded to the nearest int) of the selected line
+        # perform the cut on the cell
+        cut_cell(self, index)
 
-            cell = get_cell_from_index(self, index)
 
-            try:
-                invalid_cell_number = int(self.move_to_channel.text())
-            except:
-                self.choice = None
-                self.LogError.signal.emit('InvalidMoveChannel')
-                while self.choice is None:
-                    time.sleep(0.1)
-                return
+def valid_cut(self, index, isPopup):
 
-            if not validateMoveValue(invalid_cell_number):
-                self.choice = None
-                self.LogError.signal.emit('InvalidMoveChannel')
-                while self.choice is None:
-                    time.sleep(0.1)
-                return
+    if isPopup:
+        # the popup has a channel specific window, so we will check for that as well
+        return self.unit_drag_lines in self.active_ROI or self.channel_drag_lines in self.active_ROI
+    else:
+        # for the main window we will just determine if the index exists in the active_roi
+        return self.unit_drag_lines[index] in self.active_ROI
 
-            if invalid_cell_number == cell:
-                self.choice = None
-                self.LogError.signal.emit('SameChannelInvalid')
-                while self.choice is None:
-                    time.sleep(0.1)
-                return
 
+def update_subsample(main, channel_index, data_chan, cell):
+    _, subsample_i = findSpikeSubsample(main.unit_data[channel_index][data_chan],
+                                        main.max_spike_plots)
+
+    if cell not in main.cell_subsample_i.keys():
+        main.cell_subsample_i[cell] = {data_chan: subsample_i}
+    else:
+        main.cell_subsample_i[cell][data_chan] = subsample_i
+
+
+def cut_cell(self, index):
+    """
+    This method will be run whenever the user decides to perform a cut
+
+    :param self:
+    :param index:
+    :param ev:
+    :return:
+    """
+
+    # determine if the window is a popup or the main window
+
+    popup = False
+    if self.isPopup():
+        main = self.mainWindow
+        cell = self.cell
+        popup = True
+    else:
+        main = self
+        cell = get_cell_from_index(self, index)
+
+    # determine if the cut is valid for the popup or main window (depending on which one it is)
+    if valid_cut(self, index, popup):
+
+        # then we have an active ROI
+        # we will get the x,y positions (rounded to the nearest int) of the selected line
+
+        try:
+            invalid_cell_number = int(self.move_to_channel.text())
+        except:
+            self.choice = None
+            self.LogError.signal.emit('InvalidMoveChannel')
+            while self.choice is None:
+                time.sleep(0.1)
+            return
+
+        if not validateMoveValue(invalid_cell_number):
+            self.choice = None
+            self.LogError.signal.emit('InvalidMoveChannel')
+            while self.choice is None:
+                time.sleep(0.1)
+            return
+
+        if invalid_cell_number == cell:
+            self.choice = None
+            self.LogError.signal.emit('SameChannelInvalid')
+            while self.choice is None:
+                time.sleep(0.1)
+            return
+
+        # get the points from the line segment
+        channel = None
+        points = None
+        if popup:
+            if self.unit_drag_lines in self.active_ROI:
+                points = np.rint(np.asarray(self.unit_drag_lines.getState()['points']))
+                # channel that the user drew the line within
+                channel = get_channel_from_y(points[0, 1], channel_range=channel_range, n_channels=main.n_channels)
+            elif self.channel_drag_lines in self.active_ROI:
+                points = np.rint(np.asarray(self.channel_drag_lines.getState()['points']))
+                # channel that the user drew the line within
+                channel = int(self.channel_number.currentText()) - 1
+        else:
             points = np.rint(np.asarray(self.unit_drag_lines[index].getState()['points']))
+            # channel that the user drew the line within
+            channel = get_channel_from_y(points[0, 1], channel_range=channel_range, n_channels=main.n_channels)
 
-            # find which channel the user started in
-            channel = get_channel_from_y(points[0, 1], channel_range=channel_range, n_channels=self.n_channels)
-
-            unit_data = self.unit_data[index][channel]
-
-            crossed_cells = find_spikes_crossed(points, unit_data, samples_per_spike=self.samples_per_spike)
-
-            # append the crossed lines to the invalid cell's plot
-            invalid_index = get_index_from_cell(self, invalid_cell_number)
-
-            max_spikes_changed = False
-            # self.max_spike_plots will be none if the value has been changed recently
-            if self.max_spike_plots is None:
-                max_spike_plots = get_max_spikes(self)
-                if max_spike_plots is None:
-                    return
-                else:
-                    self.max_spike_plots = max_spike_plots
-
-                    # update the max spikes by re-calculating the subsample index values
-                    for plotted_cell in self.cell_subsample_i.keys():
-                        plotted_channel_index = get_index_from_cell(self, plotted_cell)
-
-                        if any(plotted_cell == cell_value for cell_value in [0]):
-                            # skip the invalid channel (done later) and the dummy channel (not plotted)
-                            continue
-
-                        for data_chan in np.arange(self.n_channels):
-                            _, subsample_i = findSpikeSubsample(self.unit_data[plotted_channel_index][data_chan],
-                                                                self.max_spike_plots)
-
-                            if plotted_cell not in self.cell_subsample_i.keys():
-                                self.cell_subsample_i[plotted_cell] = {data_chan: subsample_i}
-                            else:
-                                self.cell_subsample_i[plotted_cell][data_chan] = subsample_i
-                    max_spikes_changed = True
-
-            reconfigure = False
-
-            if len(crossed_cells) != 0:
-                # remove these spikes from all the channels
-                for data_chan in np.arange(self.n_channels):
-                    if invalid_index is not None:
-                        # get the invalid data
-                        invalid_cell_data = self.unit_data[index][data_chan][crossed_cells, :]
-                        # update the invalid_data channel with this current data
-                        self.unit_data[invalid_index][data_chan] = np.vstack((self.unit_data[invalid_index][data_chan],
-                                                                              invalid_cell_data))
-
-                        # update the plotted subsample as well
-                        _, subsample_i = findSpikeSubsample(self.unit_data[invalid_index][data_chan], self.max_spike_plots)
-                        if invalid_cell_number not in self.cell_subsample_i.keys():
-                            self.cell_subsample_i[invalid_cell_number] = {data_chan: subsample_i}
-                        else:
-                            self.cell_subsample_i[invalid_cell_number][data_chan] = subsample_i
-                    else:
-                        reconfigure = True
-
-                    # delete the invalid data from the selected channel
-                    self.unit_data[index][data_chan] = np.delete(self.unit_data[index][data_chan], crossed_cells, axis=0)
-
-                    # recalculate subplot for the channel that the spikes were removed from
-                    if len(self.unit_data[index][data_chan]) > 0:
-                        _, subsample_i = findSpikeSubsample(self.unit_data[index][data_chan], self.max_spike_plots)
-                        if cell not in self.cell_subsample_i.keys():
-                            self.cell_subsample_i[cell] = {data_chan: subsample_i}
-                        else:
-                            self.cell_subsample_i[cell][data_chan] = subsample_i
-                    else:
-                        # there is no data left, don't need to worry about the subsampling anymore
-                        if cell in self.cell_subsample_i.keys():
-                            self.cell_subsample_i.pop(cell)
-                            reconfigure = True
-
-                # check if the cell still exists
-                for key, value in self.unit_data[index].items():
-                    if len(value) == 0:
-                        if index != -1:
-                            # avoid popping the dummy cell (index -1)
-                            self.unit_data.pop(index)
-                            reconfigure = True
-                            break
-
-                # update the bool
-                cell_indices = self.cell_indices[cell]
-                # append invalid cells to the new cell number
-                invalid_cells = cell_indices[crossed_cells]
-                self.cell_indices[cell] = np.delete(cell_indices, crossed_cells)
-
-                # check if there are still indices for this cell, if empty we will remove
-                if len(self.cell_indices[cell]) == 0:
-                    clear_unit(self, cell)  # delete the cell's plots
-                    if cell in self.original_cell_count.keys():
-                        self.original_cell_count.pop(cell)
-                    reconfigure = True
-
-                    if cell != 0:
-                        self.cell_indices.pop(cell)
-
-                if invalid_cell_number in self.cell_indices.keys():
-                    # the cell has existed already within the main window, we can just add to this plot
-                    self.cell_indices[invalid_cell_number] = np.concatenate((self.cell_indices[invalid_cell_number],
-                                                                             invalid_cells))
-                else:
-                    # this cell is not already plotted, have to add the plot and possibly reconfigure
-                    self.cell_indices[invalid_cell_number] = invalid_cells
-
-                    if invalid_cell_number != 0:
-                        reconfigure = True
-
-                # add the latest action
-                if len(self.latest_actions) == 0 or max_num_actions == 1:
-                    self.latest_actions = {0: {'action': 'cut', 'fromCell': cell, 'toCell': invalid_cell_number,
-                                               'movedCutIndices': invalid_cells}}
-                else:
-                    next_action = get_next_action(self)
-                    self.latest_actions[next_action] = {'action': 'cut', 'fromCell': cell, 'toCell': invalid_cell_number,
-                                                        'movedCutIndices': invalid_cells}
-
-            if not reconfigure:
-                # update plots for the invalid cell and the cell you removed these spikes from
-                # no need to reconfigure
-                replot_unit(self, index)
-                invalid_index = get_index_from_cell(self, invalid_cell_number)
-                if invalid_index != -1:
-                    replot_unit(self, invalid_index)
+        # determine if the max spike plots value changed
+        max_spikes_changed = False
+        if main.max_spike_plots is None:
+            # main.max_spike_plots will be none if the value has been changed recently
+            max_spike_plots = get_max_spikes(main)
+            if max_spike_plots is None:
+                # the max spike value is not valid, don't execute the cut
+                return
             else:
-                # we will need to reconfigure the main window possibly, do so
+                # the max spike value is valid
+                # set the max spike plots value
+                main.max_spike_plots = max_spike_plots
 
-                if cell in self.cell_indices.keys():
-                    replot_unit(self, index)
+                # update the max spikes by re-calculating the subsample index values
+                for plotted_cell in main.cell_subsample_i.keys():
+                    plotted_channel_index = get_index_from_cell(main, plotted_cell)
 
-                unique_cells = np.asarray(list(self.cell_indices.keys()))
-                reconfigure_units(self, list(unique_cells[unique_cells != 0]))
-
-            if max_spikes_changed:
-                for plotted_cell in self.cell_indices.keys():
-                    if plotted_cell == invalid_cell_number or plotted_cell == cell:
+                    if any(plotted_cell == cell_value for cell_value in [0]):
+                        # skip the invalid channel (done later) and the dummy channel (not plotted)
                         continue
 
-                    plotted_cell_index = get_index_from_cell(self, plotted_cell)
-                    replot_unit(self, plotted_cell_index)
+                    for data_chan in np.arange(main.n_channels):
+                        update_subsample(main, plotted_channel_index, data_chan, plotted_cell)
 
+                max_spikes_changed = True
+
+        # getting the cell data within the detected channel
+        unit_data = main.unit_data[index][channel]
+        crossed_cells = find_spikes_crossed(points, unit_data, samples_per_spike=self.samples_per_spike)
+
+        # append the crossed lines to the invalid cell's plot
+        invalid_index = get_index_from_cell(main, invalid_cell_number)
+        reconfigure = False
+
+        if len(crossed_cells) != 0:
+            # remove these spikes from all the channels
+            for data_chan in np.arange(main.n_channels):
+                # append the crossed lines to the invalid cell's plot
+                if invalid_index is not None:
+                    # get the invalid data
+                    invalid_cell_data = main.unit_data[index][data_chan][crossed_cells, :]
+                    # update the invalid_data channel with this current data
+                    main.unit_data[invalid_index][data_chan] = np.vstack((main.unit_data[invalid_index][data_chan],
+                                                                          invalid_cell_data))
+
+                    # update the plotted subsample as well
+                    update_subsample(main, invalid_index, data_chan, invalid_cell_number)
+                else:
+                    reconfigure = True
+
+                # delete the invalid data from the selected channel
+                main.unit_data[index][data_chan] = np.delete(main.unit_data[index][data_chan], crossed_cells, axis=0)
+
+                # recalculate subplot for the channel that the spikes were removed from
+                if len(main.unit_data[index][data_chan]) > 0:
+                    update_subsample(main, index, data_chan, cell)
+                else:
+                    # there is no data left, don't need to worry about the sub-sampling anymore
+                    if cell in main.cell_subsample_i.keys():
+                        main.cell_subsample_i.pop(cell)
+                        reconfigure = True
+
+            # check if the cell still exists
+            for key, value in main.unit_data[index].items():
+                if len(value) == 0:
+                    if index != -1:
+                        # avoid popping the dummy cell (index -1)
+                        main.unit_data.pop(index)
+                        reconfigure = True
+                        break
+
+            # update the bool
+            cell_indices = main.cell_indices[cell]
+            # append invalid cells to the new cell number
+            invalid_cells = cell_indices[crossed_cells]
+            main.cell_indices[cell] = np.delete(cell_indices, crossed_cells)
+
+            # check if there are still indices for this cell, if empty we will remove
+            if len(main.cell_indices[cell]) == 0:
+                clear_unit(main, cell)  # delete the cell's plots
+                if cell in main.original_cell_count.keys():
+                    main.original_cell_count.pop(cell)
+                if cell != 0:
+                    main.cell_indices.pop(cell)
+                reconfigure = True
+
+            if invalid_cell_number in main.cell_indices.keys():
+                # the cell has existed already within the main window, we can just add to this plot
+                main.cell_indices[invalid_cell_number] = np.concatenate((main.cell_indices[invalid_cell_number],
+                                                                         invalid_cells))
+            else:
+                # this cell is not already plotted, have to add the plot and possibly reconfigure
+                main.cell_indices[invalid_cell_number] = invalid_cells
+
+                if invalid_cell_number != 0:
+                    reconfigure = True
+
+            # add the latest action
+            if len(main.latest_actions) == 0 or max_num_actions == 1:
+                main.latest_actions = {0: {'action': 'cut', 'fromCell': cell, 'toCell': invalid_cell_number,
+                                           'movedCutIndices': invalid_cells}}
+            else:
+                next_action = get_next_action(main)
+                main.latest_actions[next_action] = {'action': 'cut', 'fromCell': cell, 'toCell': invalid_cell_number,
+                                                    'movedCutIndices': invalid_cells}
+
+        if popup:
+            # re-plot the popup index
+            self.plot(index, cell)
+            for roi in self.active_ROI:
+                roi.hide()
+
+        # re-plot the main Window
+        if not reconfigure:
+            # update plots for the invalid cell and the cell you removed these spikes from
+            # no need to reconfigure
+            replot_unit(main, index)
+            invalid_index = get_index_from_cell(main, invalid_cell_number)
+            if invalid_index != -1:
+                replot_unit(main, invalid_index)
+        else:
+            # we will need to reconfigure the main window possibly, do so
+            if cell in main.cell_indices.keys():
+                replot_unit(main, index)
+
+            unique_cells = np.asarray(list(main.cell_indices.keys()))
+            reconfigure_units(main, list(unique_cells[unique_cells != 0]))
+
+        if max_spikes_changed:
+            for plotted_cell in main.cell_indices.keys():
+                if plotted_cell == invalid_cell_number or plotted_cell == cell:
+                    continue
+
+                plotted_cell_index = get_index_from_cell(main, plotted_cell)
+                replot_unit(main, plotted_cell_index)
+
+        if not popup:
             if index in self.unit_drag_lines:
                 self.unit_drag_lines[index].hide()
 
@@ -817,5 +916,5 @@ def mouse_click_event(self, index, ev=None):
             except KeyError:
                 pass
 
-            self.drag_active = False
-            self.actions_made = True
+        self.drag_active = False
+        main.actions_made = True
