@@ -838,8 +838,14 @@ class MainWindow(QtWidgets.QWidget):
             except ValueError:
                 return
 
-            cut_filename = '%s_%d.cut' % (os.path.splitext(filename)[0], tetrode)
-            self.cut_filename.setText(os.path.realpath(cut_filename))
+            cut_filename = '%s_%d.cut' % (
+                os.path.splitext(filename)[0], tetrode)
+            clu_filename = '%s.clu.%d' % (
+                os.path.splitext(filename)[0], tetrode)
+            if os.path.exists(cut_filename):
+                self.cut_filename.setText(os.path.realpath(cut_filename))
+            elif os.path.exists(clu_filename):
+                self.cut_filename.setText(os.path.realpath(clu_filename))
 
     def tetrode_changed(self):
         """

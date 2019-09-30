@@ -161,10 +161,15 @@ def find_tetrodes(self, set_fullpath):
         tetrode_list = [os.path.join(tetrode_path, file) for file in file_list
                         if is_tetrode(file, session)]
 
-        # if the .cut file doesn't exist remove list
-
-        tetrode_list = [file for file in tetrode_list if os.path.exists(
-            os.path.join(tetrode_path, '%s_%s.cut' % (os.path.splitext(file)[0], os.path.splitext(file)[1][1:])))]
+        # if the .cut or .clu.X file doesn't exist remove from list
+        tetrode_list = [file for file in tetrode_list if (
+            os.path.exists(
+                os.path.join(tetrode_path, '%s_%s.cut' % (
+                    os.path.splitext(file)[0], os.path.splitext(file)[1][1:]))) or
+            os.path.exists(
+                os.path.join(tetrode_path, '%s.clu.%s' % (
+                    os.path.splitext(file)[0], os.path.splitext(file)[1][1:])))
+        )]
 
         tetrode_files[file] = tetrode_list
 
