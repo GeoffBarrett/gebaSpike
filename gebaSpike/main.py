@@ -19,6 +19,9 @@ import time
 import numpy as np
 
 
+version = "1.1.0"
+
+
 class MainWindow(QtWidgets.QWidget):
 
     def __init__(self):
@@ -131,8 +134,6 @@ class MainWindow(QtWidgets.QWidget):
                 json.dump({}, f)
 
         # setting PyQtGraph settings
-        # pg.setConfigOption('background', 'w')
-        # pg.setConfigOption('foreground', 'k')
         pg.setConfigOptions(antialias=True)
 
         self.PopUpCutWindow = {}
@@ -325,7 +326,7 @@ class MainWindow(QtWidgets.QWidget):
 
         # ------------------------------------ version information -------------------------------------------------
 
-        vers_label = QtWidgets.QLabel("gebaSpike V1.0.10")
+        vers_label = QtWidgets.QLabel(f"gebaSpike V{version}")
 
         # --------- Create the Buttons at the bottom of the Main Window ------------- #
 

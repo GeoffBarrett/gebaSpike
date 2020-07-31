@@ -1,4 +1,5 @@
 import setuptools
+from gebaSpike.main import version
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
@@ -10,7 +11,7 @@ pkg_name = "gebaSpike"
 
 setuptools.setup(
     name=pkg_name,
-    version="1.0.10",
+    version=version,
     author="Geoffrey Barrett",
     author_email="geoffrey.m.barrett@gmail.com",
     description="gebaSpike - GUI designed to improve manual spike sorting of in-vivo electrophysiology data.",
