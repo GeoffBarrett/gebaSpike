@@ -908,8 +908,10 @@ def launch_gui():
     :return:
     """
 
+    # need to create QApplication object for PyQt5 to work
     app = QtWidgets.QApplication(sys.argv)
 
+    # call main window
     main_window = MainWindow()  # Creating the Main Window
     main_window.raise_()  # raises the Main Window
 
