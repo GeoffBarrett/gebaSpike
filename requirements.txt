@@ -3,7 +3,7 @@ gebaSpike==1.0.10
 joblib==0.13.2
 kiwisolver==1.1.0
 matplotlib==3.1.1
-numpy==1.17.1
+numpy==1.22.0
 PyOpenGL==3.1.0
 pyparsing==2.4.2
 PyQt5==5.13.0
